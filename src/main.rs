@@ -18,57 +18,67 @@ async fn get_central(manager: &Manager) -> Adapter {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let manager = Manager::new().await.unwrap();
-
-    // get the first bluetooth adapter
-    let central = get_central(&manager).await;
-
-    let central_state = central.adapter_state().await.unwrap();
-    println!("CentralState: {:?}", central_state);
-
-    let mut events = central.events().await?;
-    // start scanning for devices
-    central.start_scan(ScanFilter::default()).await?;
-
-    while let Some(event) = events.next().await {
-        match event {
-            CentralEvent::DeviceDiscovered(addr) => {
-                let peripheral = central.peripheral(&addr).await?;
-                let properties = peripheral.properties().await?;
-                let name = properties
-                    .and_then(|p| p.local_name)
-                    .map(|local_name| local_name.to_string())
-                    .unwrap_or_default();
-
-                println!("Device Discovered: {name} ({addr})");
-                if name.contains("IQOS") {
-                    let iqos = peripheral;
-                    println!("Found IQOS: {name} ({addr})");
-                    break;
-                }
-
-            }
-            CentralEvent::StateUpdate(state) => {
-                println!("State Update: {:?}", state);
-            }
-            CentralEvent::DeviceConnected(id) => {
-                println!("Device Connected: {id}");
-            }
-            CentralEvent::DeviceDisconnected(id) => {
-                println!("Device Disconnected: {id}");
-            }
-            _ => {}
-        }
+    let manager = Manager::new().await?;
+    let adapter_list = manager.adapters().await?;
+    if adapter_list.is_empty() {
+        eprintln!("No Bluetooth adapters found");
     }
 
-    // // dance party
-    // let mut rng = thread_rng();
-    // for _ in 0..20 {
-    //     let color_cmd = vec![0x56, rng.gen(), rng.gen(), rng.gen(), 0x00, 0xF0, 0xAA];
-    //     light
-    //         .write(&cmd_char, &color_cmd, WriteType::WithoutResponse)
-    //         .await?;
-    //     time::sleep(Duration::from_millis(200)).await;
-    // }
+    for adapter in adapter_list.iter() {
+        println!("Starting scan on {}...", adapter.adapter_info().await?);
+        adapter
+            .start_scan(ScanFilter::default())
+            .await
+            .expect("Can't scan BLE adapter for connected devices...");
+        time::sleep(Duration::from_secs(10)).await;
+        let peripherals = adapter.peripherals().await?;
+        if peripherals.is_empty() {
+            eprintln!("->>> BLE peripheral devices were not found, sorry. Exiting...");
+        } else {
+            // All peripheral devices in range
+            for peripheral in peripherals.iter() {
+                let properties = peripheral.properties().await?;
+                let is_connected = peripheral.is_connected().await?;
+                let local_name = properties
+                    .unwrap()
+                    .local_name
+                    .unwrap_or(String::from("(peripheral name unknown)"));
+                println!(
+                    "Peripheral {:?} is connected: {:?}",
+                    local_name, is_connected
+                );
+                if !is_connected {
+                    println!("Connecting to peripheral {:?}...", &local_name);
+                    if let Err(err) = peripheral.connect().await {
+                        eprintln!("Error connecting to peripheral, skipping: {}", err);
+                        continue;
+                    }
+                }
+                let is_connected = peripheral.is_connected().await?;
+                println!(
+                    "Now connected ({:?}) to peripheral {:?}...",
+                    is_connected, &local_name
+                );
+                peripheral.discover_services().await?;
+                println!("Discover peripheral {:?} services...", &local_name);
+                for service in peripheral.services() {
+                    println!(
+                        "Service UUID {}, primary: {}",
+                        service.uuid, service.primary
+                    );
+                    for characteristic in service.characteristics {
+                        println!("  {:?}", characteristic);
+                    }
+                }
+                if is_connected {
+                    println!("Disconnecting from peripheral {:?}...", &local_name);
+                    peripheral
+                        .disconnect()
+                        .await
+                        .expect("Error disconnecting from BLE peripheral");
+                }
+            }
+        }
+    }
     Ok(())
 }
