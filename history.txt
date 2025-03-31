@@ -1,0 +1,10 @@
+#V2
+help
+brightness low
+brightness high
+findmyiqos
+exit
+help
+test
+quit
+exit
