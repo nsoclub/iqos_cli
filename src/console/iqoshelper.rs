@@ -123,8 +123,8 @@ impl Highlighter for IqosHelper {
         self.highlighter.highlight(line, pos)
     }
 
-    fn highlight_char(&self, line: &str, pos: usize, _context: rustyline::highlight::CmdKind) -> bool {
-        self.highlighter.highlight_char(line, pos, _context)
+    fn highlight_char(&self, line: &str, pos: usize) -> bool {
+        self.highlighter.highlight_char(line, pos)
     }
 }
 

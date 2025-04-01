@@ -53,28 +53,13 @@ impl IQOS {
         self.holder_battery_level
     }
 
-    pub async fn connect(&mut self) -> Result<()> {
-        self.peripheral.connect().await
-            .map_err(IQOSError::BleError)?;
-        Ok(())
-    }
-
-    pub async fn discover_services(&mut self) -> Result<Vec<Service>> {
-        self.peripheral.discover_services().await
-            .map_err(IQOSError::BleError)?;
-        
-        Ok(self.peripheral.services().into_iter().collect())
-    }
-
     pub async fn disconnect(&mut self) -> Result<()> {
-        self.peripheral.disconnect().await
+        let peripheral = self.peripheral.clone();
+        
+        peripheral.disconnect().await
             .map_err(IQOSError::BleError)
     }
 
-    pub async fn is_connected(&self) -> Result<bool> {
-        self.peripheral.is_connected().await
-            .map_err(IQOSError::BleError)
-    }
 
     pub async fn initialize(&mut self) -> Result<()> {
         self.peripheral.discover_services().await
