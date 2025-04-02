@@ -78,15 +78,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                         println!("      特性 #{}.{}: {}", i + 1, j + 1, characteristic.uuid);
                                         println!("        プロパティ: {:?}", characteristic.properties);
                                         
-                                        // 標準特性の場合は名前も表示
-                                        match characteristic.uuid.to_string().as_str() {
-                                            "00002a24-0000-1000-8000-00805f9b34fb" => println!("        名前: モデル番号"),
-                                            "00002a25-0000-1000-8000-00805f9b34fb" => println!("        名前: シリアル番号"),
-                                            "00002a26-0000-1000-8000-00805f9b34fb" => println!("        名前: ファームウェアリビジョン"),
-                                            "00002a27-0000-1000-8000-00805f9b34fb" => println!("        名前: ハードウェアリビジョン"),
-                                            "00002a29-0000-1000-8000-00805f9b34fb" => println!("        名前: 製造者名"),
-                                            "00002a19-0000-1000-8000-00805f9b34fb" => println!("        名前: バッテリーレベル"),
-                                            _ => {}
+                                        // Device Information Serviceの場合、characteristic UUIDを判別
+                                        if service.uuid.to_string() == "0000180a-0000-1000-8000-00805f9b34fb" {
+                                            let uuid_string = characteristic.uuid.to_string();
+                                            let uuid_short = uuid_string.split('-').next().unwrap_or("");
+                                            match uuid_short {
+                                                "00002a24" => println!("        標準特性: Model Number String"),
+                                                "00002a25" => println!("        標準特性: Serial Number String"),
+                                                "00002a28" => println!("        標準特性: Software Revision String"),
+                                                "00002a29" => println!("        標準特性: Manufacturer Name String"),
+                                                _ => println!("        標準特性: 未定義"),
+                                            }
                                         }
                                         
                                         // 読み取り可能な場合は値を読み取って表示
@@ -100,7 +102,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                                             if text.chars().all(|c| c.is_ascii_graphic() || c.is_ascii_whitespace()) {
                                                                 println!("値 (文字列): {}", text);
                                                             } else {
-                                                                println!("値 (バイト): {:?}", data);
+                                                                // バイトデータをASCIIエンコードして表示
+                                                                println!("値 (ASCII): {}", data.iter()
+                                                                    .map(|&b| b.to_ascii_lowercase() as char)
+                                                                    .collect::<String>());
                                                             }
                                                         } else {
                                                             // バイナリデータの場合は16進数で表示
