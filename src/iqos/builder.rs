@@ -6,13 +6,16 @@ use btleplug::api::{Service, Characteristic, Peripheral as _};
 use std::collections::BTreeSet;
 
 use uuid::{Uuid, uuid};
+use btleplug::api::bleuuid::uuid_from_u16;
 
 // デバイス情報サービスUUID
 const DEVICE_INFO_SERVICE_UUID: Uuid = uuid!("0000180a-0000-1000-8000-00805f9b34fb");
-const MODEL_NUMBER_CHAR_UUID: Uuid = uuid!("00002a24-0000-1000-8000-00805f9b34fb");
-const SERIAL_NUMBER_CHAR_UUID: Uuid = uuid!("00002a25-0000-1000-8000-00805f9b34fb");
-const FIRMWARE_REVISION_CHAR_UUID: Uuid = uuid!("00002a26-0000-1000-8000-00805f9b34fb");
-const MANUFACTURER_NAME_CHAR_UUID: Uuid = uuid!("00002a29-0000-1000-8000-00805f9b34fb");
+
+// 標準特性UUID
+const MODEL_NUMBER_CHAR_UUID: &str = "00002a24";
+const SERIAL_NUMBER_CHAR_UUID: &str = "00002a25";
+const SOFTWARE_REVISION_CHAR_UUID: &str = "00002a28";
+const MANUFACTURER_NAME_CHAR_UUID: &str = "00002a29";
 
 pub struct IQOSBuilder {
     peripheral: Option<Peripheral>,
@@ -23,9 +26,9 @@ pub struct IQOSBuilder {
 }
 
 impl IQOSBuilder {
-    pub fn new() -> Self {
+    pub fn new(peripheral: Peripheral) -> Self {
         Self {
-            peripheral: None,
+            peripheral: Some(peripheral),
             modelnumber: None,
             serialnumber: None,
             softwarerevision: None,
@@ -108,50 +111,49 @@ impl IQOSBuilder {
             .cloned())
     }
 
-    async fn update_device_info(&mut self) -> Result<()> {
+    pub async fn update_device_info(&mut self) -> Result<()> {
         let peripheral = self.peripheral
             .as_mut()
             .ok_or(IQOSError::ConfigurationError("Peripheral is required".to_string()))?;
         
         // デバイス情報サービスからキャラクタリスティックを読み取る
         if let Some(service) = peripheral.services().iter().find(|s| s.uuid == DEVICE_INFO_SERVICE_UUID) {
-            // モデル番号
-            if let Some(char) = service.characteristics.iter().find(|c| c.uuid == MODEL_NUMBER_CHAR_UUID) {
-                if let Ok(data) = peripheral.read(char).await.map_err(IQOSError::BleError) {
-                    if let Ok(value) = String::from_utf8(data) {
-                        self.modelnumber = Some(value);
-                    }
-                }
-            }
-            
-            // シリアル番号
-            if let Some(char) = service.characteristics.iter().find(|c| c.uuid == SERIAL_NUMBER_CHAR_UUID) {
-                if let Ok(data) = peripheral.read(char).await.map_err(IQOSError::BleError) {
-                    if let Ok(value) = String::from_utf8(data) {
-                        self.serialnumber = Some(value);
-                    }
-                }
-            }
-            
-            // ファームウェアリビジョン
-            if let Some(char) = service.characteristics.iter().find(|c| c.uuid == FIRMWARE_REVISION_CHAR_UUID) {
-                if let Ok(data) = peripheral.read(char).await.map_err(IQOSError::BleError) {
-                    if let Ok(value) = String::from_utf8(data) {
-                        self.softwarerevision = Some(value);
-                    }
-                }
-            }
-            
-            // 製造者名
-            if let Some(char) = service.characteristics.iter().find(|c| c.uuid == MANUFACTURER_NAME_CHAR_UUID) {
-                if let Ok(data) = peripheral.read(char).await.map_err(IQOSError::BleError) {
-                    if let Ok(value) = String::from_utf8(data) {
-                        self.manufacturername = Some(value);
-                    }
+            for characteristic in &service.characteristics {
+                match characteristic.uuid.to_string().split('-').next().unwrap() {
+                    uuid if uuid == MODEL_NUMBER_CHAR_UUID => {
+                        if let Ok(data) = peripheral.read(characteristic).await.map_err(IQOSError::BleError) {
+                            if let Ok(value) = String::from_utf8(data) {
+                                self.modelnumber = Some(value);
+                            }
+                        }
+                    },
+                    uuid if uuid == SERIAL_NUMBER_CHAR_UUID => {
+                        if let Ok(data) = peripheral.read(characteristic).await.map_err(IQOSError::BleError) {
+                            if let Ok(value) = String::from_utf8(data) {
+                                self.serialnumber = Some(value);
+                            }
+                        }
+                    },
+                    uuid if uuid == SOFTWARE_REVISION_CHAR_UUID => {
+                        if let Ok(data) = peripheral.read(characteristic).await.map_err(IQOSError::BleError) {
+                            if let Ok(value) = String::from_utf8(data) {
+                                self.softwarerevision = Some(value);
+                            }
+                        }
+                    },
+                    uuid if uuid == MANUFACTURER_NAME_CHAR_UUID => {
+                        if let Ok(data) = peripheral.read(characteristic).await.map_err(IQOSError::BleError) {
+                            if let Ok(value) = String::from_utf8(data) {
+                                self.manufacturername = Some(value);
+                            }
+                        }
+                    },
+                    _ => {}
                 }
             }
         }
         
+        println!("Device Info Updated {}", self.manufacturername.clone().unwrap());
         Ok(())
     }
 
@@ -207,8 +209,8 @@ impl IQOSBuilder {
     }
 }
 
-impl Default for IQOSBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-} 
+// impl Default for IQOSBuilder {
+//     fn default() -> Self {
+//         Self::new(Peripheral::default())
+//     }
+// } 

@@ -47,8 +47,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                 println!("Device Discovered: {name} ({addr})");
                 if name.contains("IQOS") {
-                    iqos = iqos::IQOSBuilder::new();
-                    iqos = iqos.with_peripheral(peripheral).await?;
+                    iqos = iqos::IQOSBuilder::new(peripheral);
                     let is_connected = iqos.is_connected().await?;
 
                     println!("Found IQOS: {name} ({addr})");
@@ -63,6 +62,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         iqos.connect().await?;
                         println!("Connected! Discovering services...");
                         let services = iqos.discover_services().await?;
+                        iqos.update_device_info().await?;
                         
                         println!("発見されたサービス:");
                         if services.is_empty() {
