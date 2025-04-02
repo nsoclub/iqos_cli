@@ -153,7 +153,6 @@ impl IQOSBuilder {
             }
         }
         
-        println!("Device Info Updated {}", self.manufacturername.clone().unwrap());
         Ok(())
     }
 
