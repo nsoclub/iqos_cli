@@ -54,8 +54,8 @@ impl IQOSConsole {
             console.handle_help(args)
         }));
         
-        commands.insert("status".to_string(), Box::new(|console, args| {
-            console.handle_status(args)
+        commands.insert("info".to_string(), Box::new(|console, args| {
+            console.handle_info(args)
         }));
     }
     
@@ -206,8 +206,7 @@ impl IQOSConsole {
     }
     
     /// ステータス表示コマンド
-    fn handle_status(&self, _args: &[&str]) -> Result<()> {
-        println!("IQOSデバイスのステータスを取得中...");
+    fn handle_info(&self, _args: &[&str]) -> Result<()> {
         // 実際のIQOS操作コード
         // let iqos = self.iqos.lock().unwrap();
         // let status = iqos.get_status()?;
@@ -215,10 +214,9 @@ impl IQOSConsole {
         // println!("接続状態: {}", if status.is_connected { "接続中" } else { "未接続" });
         
         // 仮のステータス表示
-        println!("バッテリー残量: 82%");
-        println!("接続状態: 接続中");
-        println!("ホルダー温度: 正常");
-        
+        if let Ok(iqos) = self.iqos.lock() {
+            println!("\n{}\n", iqos)
+        }
         Ok(())
     }
     
@@ -228,7 +226,7 @@ impl IQOSConsole {
         println!("  brightness [high|medium|low] - 明るさを設定します");
         println!("  findmyiqos - デバイスを探す機能を起動します");
         println!("  smartgesture [enable|disable] - スマートジェスチャー機能を設定します");
-        println!("  status - デバイスのステータスを表示します");
+        println!("  info - デバイスのステータスを表示します");
         println!("  help - このヘルプメッセージを表示します");
         println!("  exit - プログラムを終了します");
         Ok(())

@@ -3,6 +3,7 @@ use btleplug::platform::Peripheral;
 use btleplug::api::{Peripheral as _, Service, Characteristic};
 use anyhow::Context;
 use std::option::Option;
+use std::fmt;
 
 pub struct IQOS {
     modelnumber: String,
@@ -86,3 +87,15 @@ impl IQOS {
         Ok(())
     }
 } 
+
+impl fmt::Display for IQOS {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f,
+            "Model Number: {}\nSerial Number: {}\nSoftware Revision: {}\nManufacture Name: {}",
+            self.modelnumber,
+            self.serialnumber,
+            self.softwarerevision,
+            self.manufacturername,
+        )
+    }
+}

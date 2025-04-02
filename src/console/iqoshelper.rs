@@ -20,7 +20,7 @@ impl IqosHelper {
             "smartgesture".to_string(),
             "help".to_string(),
             "exit".to_string(),
-            "status".to_string(),
+            "info".to_string(),
         ];
         
         IqosHelper {
