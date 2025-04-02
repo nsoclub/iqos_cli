@@ -8,6 +8,8 @@ pub enum IQOSError {
     BleError(#[from] btleplug::Error),
     #[error("デバイス設定エラー: {0}")]
     ConfigurationError(String),
+    #[error("Characteristic not found")]
+    CharacteristicNotFound,
 }
 
 pub type Result<T> = std::result::Result<T, IQOSError>; 
