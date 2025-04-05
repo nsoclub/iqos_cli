@@ -15,7 +15,7 @@ pub struct IQOS {
     serialnumber: String,
     softwarerevision: String,
     manufacturername: String,
-    holder_battery_level: u8,
+    holder_battery_status: u8,
     scp_characteristic_uuid: String,
     peripheral: Peripheral,
 }
@@ -34,7 +34,7 @@ impl IQOS {
             serialnumber,
             softwarerevision,
             manufacturername,
-            holder_battery_level: 0,
+            holder_battery_status: 0,
             scp_characteristic_uuid: String::new(),
         }
     }
@@ -55,8 +55,8 @@ impl IQOS {
         &self.manufacturername
     }
 
-    pub fn battery_level(&self) -> u8 {
-        self.holder_battery_level
+    pub fn battery_status(&self) -> u8 {
+        self.holder_battery_status
     }
 
     pub async fn disconnect(&mut self) -> Result<()> {
@@ -92,7 +92,7 @@ impl IQOS {
         Ok(())
     }
 
-    pub async fn reload_battery(&mut self) -> Result<()> {
+    pub async fn reload_battery(& mut self) -> Result<()> {
         let peripheral = &self.peripheral;
 
         // サービスとキャラクタリスティックを取得
@@ -102,29 +102,12 @@ impl IQOS {
             .find(|chara| chara.uuid == BATTERY_CHARA_UUID)
             .ok_or(IQOSError::CharacteristicNotFound)?;
 
-        // 通知を開始
-        peripheral
-            .subscribe(battery_chara)
+        if let Ok(data) = peripheral.read(battery_chara)
             .await
-            .map_err(IQOSError::BleError)?;
-
-        println!("バッテリー情報の通知を開始しました");
-
-        // 通知を受信して処理
-        let mut notifications = peripheral
-            .notifications()
-            .await
-            .map_err(IQOSError::BleError)?;
-
-        while let Some(ret) = notifications.next().await {
-            if ret.uuid == BATTERY_CHARA_UUID {
-                if let Some(level) = ret.value.first() {
-                    self.holder_battery_level = *level;
-                    println!("バッテリーレベル更新: {}%", self.holder_battery_level);
-                    break;
-                }
+            .map_err(IQOSError::BleError) {
+                let battery_status = u8::from_str_radix(&format!("{:02X}", data[2]), 16);
+                self.holder_battery_status = battery_status.unwrap_or(0);
             }
-        }
         Ok(())
     }
 }
