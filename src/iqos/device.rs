@@ -109,15 +109,6 @@ impl IQOS {
 
         Ok(())
     }
-
-    pub fn peripheral(&self) -> &Peripheral {
-        &self.peripheral
-    }
-
-    pub fn characteristics(&self) -> BTreeSet<Characteristic> {
-        self.peripheral.characteristics()
-    }
-    
 }
 
 impl fmt::Display for IQOS {

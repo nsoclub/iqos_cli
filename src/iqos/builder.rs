@@ -42,26 +42,6 @@ impl IQOSBuilder {
         Ok(self)
     }
 
-    pub fn with_model_number(mut self, modelnumber: impl Into<String>) -> Self {
-        self.modelnumber = Some(modelnumber.into());
-        self
-    }
-
-    pub fn with_serial_number(mut self, serialnumber: impl Into<String>) -> Self {
-        self.serialnumber = Some(serialnumber.into());
-        self
-    }
-
-    pub fn with_software_revision(mut self, softwarerevision: impl Into<String>) -> Self {
-        self.softwarerevision = Some(softwarerevision.into());
-        self
-    }
-
-    pub fn with_manufacturer_name(mut self, manufacturername: impl Into<String>) -> Self {
-        self.manufacturername = Some(manufacturername.into());
-        self
-    }
-
     pub async fn discover_services(&mut self) -> Result<BTreeSet<Service>> {
         let peripheral = self.peripheral
             .as_mut()
