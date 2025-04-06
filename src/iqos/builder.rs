@@ -1,21 +1,14 @@
 use super::device::IQOS;
 use super::error::{IQOSError, Result};
-use anyhow::Context;
+use super::{
+    DEVICE_INFO_SERVICE_UUID, MODEL_NUMBER_CHAR_UUID, 
+    SERIAL_NUMBER_CHAR_UUID, SOFTWARE_REVISION_CHAR_UUID,
+    MANUFACTURER_NAME_CHAR_UUID
+};
 use btleplug::platform::Peripheral;
-use btleplug::api::{Service, Characteristic, Peripheral as _};
+use btleplug::api::{Service, Peripheral as _};
 use std::collections::BTreeSet;
-
-use uuid::{Uuid, uuid};
-use btleplug::api::bleuuid::uuid_from_u16;
-
-// デバイス情報サービスUUID
-const DEVICE_INFO_SERVICE_UUID: Uuid = uuid!("0000180a-0000-1000-8000-00805f9b34fb");
-
-// 標準特性UUID
-const MODEL_NUMBER_CHAR_UUID: &str = "00002a24";
-const SERIAL_NUMBER_CHAR_UUID: &str = "00002a25";
-const SOFTWARE_REVISION_CHAR_UUID: &str = "00002a28";
-const MANUFACTURER_NAME_CHAR_UUID: &str = "00002a29";
+use uuid::Uuid;
 
 pub struct IQOSBuilder {
     peripheral: Option<Peripheral>,
@@ -212,4 +205,4 @@ impl IQOSBuilder {
 //     fn default() -> Self {
 //         Self::new(Peripheral::default())
 //     }
-// } 
+// }

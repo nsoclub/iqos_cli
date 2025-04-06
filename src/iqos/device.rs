@@ -1,14 +1,14 @@
 use super::error::{IQOSError, Result};
-use anyhow::Context;
-use btleplug::api::{Characteristic, Peripheral as _, Service};
+use super::{
+    BATTERY_CHARACTERISTIC_UUID,
+    SCP_CONTROL_CHARACTERISTIC_UUID,
+};
+use btleplug::api::{Characteristic, Peripheral as _, WriteType};
 use btleplug::platform::Peripheral;
-use futures::stream::StreamExt;
-use uuid::{uuid, Uuid};
-
 use std::fmt;
-use std::option::Option;
+use std::collections::BTreeSet;
 
-const BATTERY_CHARA_UUID: Uuid = uuid!("f8a54120-b041-11e4-9be7-0002a5d5c51b");
+const START_VIBRATION_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x00, 0xc3];
 
 pub struct IQOS {
     modelnumber: String,
@@ -16,7 +16,6 @@ pub struct IQOS {
     softwarerevision: String,
     manufacturername: String,
     holder_battery_status: u8,
-    scp_characteristic_uuid: String,
     peripheral: Peripheral,
 }
 
@@ -35,7 +34,6 @@ impl IQOS {
             softwarerevision,
             manufacturername,
             holder_battery_status: 0,
-            scp_characteristic_uuid: String::new(),
         }
     }
 
@@ -65,25 +63,6 @@ impl IQOS {
         peripheral.disconnect().await.map_err(IQOSError::BleError)
     }
 
-    pub async fn initialize(&mut self) -> Result<()> {
-        self.peripheral
-            .discover_services()
-            .await
-            .map_err(IQOSError::BleError)?;
-
-        for service in self.peripheral.services() {
-            for characteristic in service.characteristics {
-                if characteristic.uuid.to_string().starts_with("FFE9") {
-                    self.scp_characteristic_uuid = characteristic.uuid.to_string();
-                    break;
-                }
-            }
-        }
-
-        self.update_device_info().await?;
-        Ok(())
-    }
-
     async fn update_device_info(&mut self) -> Result<()> {
         // ここでデバイスの情報を取得して各フィールドを更新
         // モデル番号、シリアル番号、ソフトウェアバージョン、製造者名など
@@ -99,7 +78,7 @@ impl IQOS {
         let characteristics = peripheral.characteristics();
         let battery_chara = characteristics
             .iter()
-            .find(|chara| chara.uuid == BATTERY_CHARA_UUID)
+            .find(|chara| chara.uuid == BATTERY_CHARACTERISTIC_UUID)
             .ok_or(IQOSError::CharacteristicNotFound)?;
 
         if let Ok(data) = peripheral.read(battery_chara)
@@ -110,6 +89,35 @@ impl IQOS {
             }
         Ok(())
     }
+
+    pub async fn vibrate(&self) -> Result<()> {
+        let peripheral = &self.peripheral;
+
+        // SCPキャラクタリスティックを取得
+        let characteristics = peripheral.characteristics();
+        let scp_characteristic = characteristics
+            .iter()
+            .find(|chara| chara.uuid.to_string() == SCP_CONTROL_CHARACTERISTIC_UUID.to_string())
+            .ok_or(IQOSError::CharacteristicNotFound)?;
+
+        // SCPキャラクタリスティックに書き込み
+        peripheral.write(
+            scp_characteristic,
+            &START_VIBRATION_SIGNAL,
+            WriteType::WithResponse,
+        ).await.map_err(IQOSError::BleError)?;
+
+        Ok(())
+    }
+
+    pub fn peripheral(&self) -> &Peripheral {
+        &self.peripheral
+    }
+
+    pub fn characteristics(&self) -> BTreeSet<Characteristic> {
+        self.peripheral.characteristics()
+    }
+    
 }
 
 impl fmt::Display for IQOS {

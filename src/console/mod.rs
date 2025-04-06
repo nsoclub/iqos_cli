@@ -14,6 +14,8 @@ use iqoshelper::IqosHelper;
 use crate::iqos::IQOS;
 
 type CommandFn = Box<dyn Fn(&IQOSConsole, &[&str]) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
+const VIBRATION_START: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x00, 0xc3];
+const VIBRATION_STOP: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x00, 0x1e, 0x00, 0x00, 0xd5];
 
 #[derive(Clone)]
 pub struct IQOSConsole {
@@ -56,19 +58,45 @@ impl IQOSConsole {
             Box::pin(async move {
                 match args.get(1).map(|s| s.as_str()) {
                     Some("high") => println!("明るさを高に設定しました"),
-                    Some("medium") => println!("明るさを中に設定しました"),
                     Some("low") => println!("明るさを低に設定しました"),
-                    Some(opt) => println!("無効なオプション: {}。'high', 'medium', 'low' のいずれかを指定してください", opt),
+                    Some(opt) => println!("無効なオプション: {}。'high', 'low' のいずれかを指定してください", opt),
                     None => println!("使い方: brightness [high|medium|low]"),
                 }
                 Ok(())
             })
         }));
         
-        commands.insert("findmyiqos".to_string(), Box::new(|_console: &IQOSConsole, _| {
+        commands.insert("findmyiqos".to_string(), Box::new(|console: &IQOSConsole, _| {
+            let iqos = console.iqos.clone();
             Box::pin(async move {
-                println!("IQOSを探しています...");
-                println!("Find my IQOS機能が起動しました");
+                let mut iqos = iqos.lock().await;
+                println!("Find My IQOS...");
+                println!("Press Enter to stop vibration...");
+                
+                // Start vibration
+                if let Some(characteristic) = iqos.characteristics().iter()
+                    .find(|c| c.uuid.to_string().starts_with("FFE9")) {
+                    let _ = iqos.peripheral().write(
+                        characteristic,
+                        &VIBRATION_START,
+                        btleplug::api::WriteType::WithoutResponse,
+                    ).await;
+                }
+
+                // Wait for Enter key
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input)?;
+
+                // Stop vibration
+                if let Some(characteristic) = iqos.characteristics().iter()
+                    .find(|c| c.uuid.to_string().starts_with("FFE9")) {
+                    let _ = iqos.peripheral().write(
+                        characteristic,
+                        &VIBRATION_STOP,
+                        btleplug::api::WriteType::WithoutResponse,
+                    ).await;
+                }
+
                 Ok(())
             })
         }));
