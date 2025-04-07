@@ -44,22 +44,6 @@ impl IQOS {
         }
     }
 
-    pub fn model_number(&self) -> &str {
-        &self.modelnumber
-    }
-
-    pub fn serial_number(&self) -> &str {
-        &self.serialnumber
-    }
-
-    pub fn software_revision(&self) -> &str {
-        &self.softwarerevision
-    }
-
-    pub fn manufacturer_name(&self) -> &str {
-        &self.manufacturername
-    }
-
     pub fn battery_status(&self) -> u8 {
         self.holder_battery_status
     }
