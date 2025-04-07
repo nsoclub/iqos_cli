@@ -8,7 +8,8 @@ use btleplug::platform::Peripheral;
 use std::fmt;
 use std::collections::BTreeSet;
 
-const START_VIBRATION_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x00, 0xc3];
+const START_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x00, 0xc3];
+const STPOP_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x00, 0x1e, 0x00, 0x00, 0xd5];
 
 pub struct IQOS {
     modelnumber: String,
@@ -86,7 +87,19 @@ impl IQOS {
 
         peripheral.write(
             &self.scp_control_characteristic,
-            &START_VIBRATION_SIGNAL,
+            &START_VIBRATE_SIGNAL,
+            WriteType::WithResponse,
+        ).await.map_err(IQOSError::BleError)?;
+
+        Ok(())
+    }
+
+    pub async fn stop_vibrate(&self) -> Result<()> {
+        let peripheral = &self.peripheral;
+
+        peripheral.write(
+            &self.scp_control_characteristic,
+            &STPOP_VIBRATE_SIGNAL,
             WriteType::WithResponse,
         ).await.map_err(IQOSError::BleError)?;
 

@@ -1,5 +1,5 @@
 use rustyline::error::ReadlineError;
-use rustyline::{Editor, Config};
+use rustyline::{Config, DefaultEditor, Editor};
 use anyhow::Result;
 use tokio::sync::Mutex;
 
@@ -14,8 +14,6 @@ use iqoshelper::IqosHelper;
 use crate::iqos::IQOS;
 
 type CommandFn = Box<dyn Fn(&IQOSConsole, &[&str]) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
-const VIBRATION_START: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x00, 0xc3];
-const VIBRATION_STOP: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x00, 0x1e, 0x00, 0x00, 0xd5];
 
 #[derive(Clone)]
 pub struct IQOSConsole {
@@ -68,12 +66,22 @@ impl IQOSConsole {
         
         commands.insert("findmyiqos".to_string(), Box::new(|console: &IQOSConsole, _| {
             let iqos = console.iqos.clone();
+            let mut rl = DefaultEditor::new().unwrap();
             Box::pin(async move {
                 let iqos = iqos.lock().await;
                 println!("Find My IQOS...");
-                println!("Press Enter to stop vibration...");
-                
                 iqos.vibrate().await?;
+                let input = rl.readline("Press <Enter> to stop vibration");
+                
+                match input {
+                    Ok(_) => {
+                        iqos.stop_vibrate().await?;
+                        print!("Vibration stopped.\n");
+                    }
+                    Err(_) => {
+                        println!("Vibration stopped.");
+                    }
+                }
 
                 Ok(())
             })
