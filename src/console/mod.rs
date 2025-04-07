@@ -11,7 +11,7 @@ use std::future::Future;
 mod iqoshelper;
 use iqoshelper::IqosHelper;
 
-use crate::iqos::IQOS;
+use crate::iqos::{self, IQOS};
 
 type CommandFn = Box<dyn Fn(&IQOSConsole, &[&str]) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
 
@@ -63,6 +63,26 @@ impl IQOSConsole {
                 Ok(())
             })
         }));
+
+        commands.insert("lock".to_string(), Box::new(|console: &IQOSConsole, _| {
+            let iqos = console.iqos.clone();
+            Box::pin(async move {
+                let iqos = iqos.lock().await;
+                iqos.lock().await?;
+                println!("Locked the IQOS");
+                Ok(())
+            })
+        }));
+
+        commands.insert("unlock".to_string(), Box::new(|console: &IQOSConsole, _| {
+            let iqos = console.iqos.clone();
+            Box::pin(async move {
+                let iqos = iqos.lock().await;
+                iqos.unlock().await?;
+                println!("Unlocked the IQOS");
+                Ok(())
+            })
+        }));
         
         commands.insert("findmyiqos".to_string(), Box::new(|console: &IQOSConsole, _| {
             let iqos = console.iqos.clone();
@@ -104,11 +124,13 @@ impl IQOSConsole {
             Box::pin(async move {
                 println!("利用可能なコマンド:");
                 println!("  brightness [high|medium|low] - 明るさを設定します");
+                println!("  battery - バッテリーの状態を表示します");
+                println!("  lock | unlock - デバイスをロックまたはアンロックします");
                 println!("  findmyiqos - デバイスを探す機能を起動します");
                 println!("  smartgesture [enable|disable] - スマートジェスチャー機能を設定します");
                 println!("  info - デバイスのステータスを表示します");
                 println!("  help - このヘルプメッセージを表示します");
-                println!("  exit - プログラムを終了します");
+                println!("  quit | exit - プログラムを終了します");
                 Ok(())
             })
         }));

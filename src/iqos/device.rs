@@ -1,15 +1,15 @@
 use super::error::{IQOSError, Result};
-use super::{
-    BATTERY_CHARACTERISTIC_UUID,
-    SCP_CONTROL_CHARACTERISTIC_UUID,
-};
 use btleplug::api::{Characteristic, Peripheral as _, WriteType};
 use btleplug::platform::Peripheral;
 use std::fmt;
-use std::collections::BTreeSet;
 
+const CONFIRMATION_SIGNAL: [u8; 5] = [0x00, 0xc0, 0x01, 0x00, 0x15];
 const START_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x00, 0xc3];
 const STOP_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x00, 0x1e, 0x00, 0x00, 0xd5];
+const LOCK_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc9, 0x44, 0x04, 0x02, 0xff, 0x00, 0x00, 0x5a];
+const LOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0x1c];
+const UNLOCK_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc9, 0x44, 0x04, 0x00, 0x00, 0x00, 0x00, 0x5d];
+const UNLOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0x1c];
 
 pub struct IQOS {
     modelnumber: String,
@@ -84,6 +84,54 @@ impl IQOS {
         peripheral.write(
             &self.scp_control_characteristic,
             &STOP_VIBRATE_SIGNAL,
+            WriteType::WithResponse,
+        ).await.map_err(IQOSError::BleError)?;
+
+        Ok(())
+    }
+
+    pub async fn lock(&self) -> Result<()> {
+        let peripheral = &self.peripheral;
+
+        peripheral.write(
+            &self.scp_control_characteristic,
+            &LOCK_SIGNAL_FIRST,
+            WriteType::WithResponse,
+        ).await.map_err(IQOSError::BleError)?;
+
+        peripheral.write(
+            &self.scp_control_characteristic,
+            &LOCK_SIGNAL_SECOND,
+            WriteType::WithResponse,
+        ).await.map_err(IQOSError::BleError)?;
+
+        peripheral.write(
+            &self.scp_control_characteristic,
+            &CONFIRMATION_SIGNAL,
+            WriteType::WithResponse,
+        ).await.map_err(IQOSError::BleError)?;
+
+        Ok(())
+    }
+
+    pub async fn unlock(&self) -> Result<()> {
+        let peripheral = &self.peripheral;
+
+        peripheral.write(
+            &self.scp_control_characteristic,
+            &UNLOCK_SIGNAL_FIRST,
+            WriteType::WithResponse,
+        ).await.map_err(IQOSError::BleError)?;
+
+        peripheral.write(
+            &self.scp_control_characteristic,
+            &UNLOCK_SIGNAL_SECOND,
+            WriteType::WithResponse,
+        ).await.map_err(IQOSError::BleError)?;
+
+        peripheral.write(
+            &self.scp_control_characteristic,
+            &CONFIRMATION_SIGNAL,
             WriteType::WithResponse,
         ).await.map_err(IQOSError::BleError)?;
 
