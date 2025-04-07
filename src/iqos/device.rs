@@ -9,7 +9,7 @@ use std::fmt;
 use std::collections::BTreeSet;
 
 const START_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x00, 0xc3];
-const STPOP_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x00, 0x1e, 0x00, 0x00, 0xd5];
+const STOP_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x00, 0x1e, 0x00, 0x00, 0xd5];
 
 pub struct IQOS {
     modelnumber: String,
@@ -99,7 +99,7 @@ impl IQOS {
 
         peripheral.write(
             &self.scp_control_characteristic,
-            &STPOP_VIBRATE_SIGNAL,
+            &STOP_VIBRATE_SIGNAL,
             WriteType::WithResponse,
         ).await.map_err(IQOSError::BleError)?;
 
