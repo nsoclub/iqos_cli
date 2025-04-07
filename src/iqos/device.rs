@@ -72,14 +72,7 @@ impl IQOS {
     pub async fn reload_battery(& mut self) -> Result<()> {
         let peripheral = &self.peripheral;
 
-        // サービスとキャラクタリスティックを取得
-        let characteristics = peripheral.characteristics();
-        let battery_chara = characteristics
-            .iter()
-            .find(|chara| chara.uuid == BATTERY_CHARACTERISTIC_UUID)
-            .ok_or(IQOSError::CharacteristicNotFound)?;
-
-        if let Ok(data) = peripheral.read(battery_chara)
+        if let Ok(data) = peripheral.read(&self.battery_characteristic)
             .await
             .map_err(IQOSError::BleError) {
                 let battery_status = u8::from_str_radix(&format!("{:02X}", data[2]), 16);
@@ -91,16 +84,8 @@ impl IQOS {
     pub async fn vibrate(&self) -> Result<()> {
         let peripheral = &self.peripheral;
 
-        // SCPキャラクタリスティックを取得
-        let characteristics = peripheral.characteristics();
-        let scp_characteristic = characteristics
-            .iter()
-            .find(|chara| chara.uuid.to_string() == SCP_CONTROL_CHARACTERISTIC_UUID.to_string())
-            .ok_or(IQOSError::CharacteristicNotFound)?;
-
-        // SCPキャラクタリスティックに書き込み
         peripheral.write(
-            scp_characteristic,
+            &self.scp_control_characteristic,
             &START_VIBRATION_SIGNAL,
             WriteType::WithResponse,
         ).await.map_err(IQOSError::BleError)?;

@@ -7,11 +7,11 @@ use uuid::{uuid, Uuid};
 pub use builder::IQOSBuilder;
 pub use device::IQOS;
 
-// BLEサービスUUID定数
+// Service UUIDs
 pub const DEVICE_INFO_SERVICE_UUID: Uuid = uuid!("0000180a-0000-1000-8000-00805f9b34fb");
-pub const BATTERY_SERVICE_UUID: Uuid = uuid!("00000180-0000-1000-8000-00805f9b34fb");
+pub const CORE_SERVICE_UUID: Uuid = uuid!("daebb240-b041-11e4-9e45-0002a5d5c51b");
 
-// BLE特性UUID定数
+// Characteristic UUIDs
 pub const MODEL_NUMBER_CHAR_UUID: &str = "00002a24";
 pub const SERIAL_NUMBER_CHAR_UUID: &str = "00002a25";
 pub const SOFTWARE_REVISION_CHAR_UUID: &str = "00002a28";

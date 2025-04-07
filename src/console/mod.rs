@@ -69,33 +69,11 @@ impl IQOSConsole {
         commands.insert("findmyiqos".to_string(), Box::new(|console: &IQOSConsole, _| {
             let iqos = console.iqos.clone();
             Box::pin(async move {
-                let mut iqos = iqos.lock().await;
+                let iqos = iqos.lock().await;
                 println!("Find My IQOS...");
                 println!("Press Enter to stop vibration...");
                 
-                // Start vibration
-                if let Some(characteristic) = iqos.characteristics().iter()
-                    .find(|c| c.uuid.to_string().starts_with("FFE9")) {
-                    let _ = iqos.peripheral().write(
-                        characteristic,
-                        &VIBRATION_START,
-                        btleplug::api::WriteType::WithoutResponse,
-                    ).await;
-                }
-
-                // Wait for Enter key
-                let mut input = String::new();
-                std::io::stdin().read_line(&mut input)?;
-
-                // Stop vibration
-                if let Some(characteristic) = iqos.characteristics().iter()
-                    .find(|c| c.uuid.to_string().starts_with("FFE9")) {
-                    let _ = iqos.peripheral().write(
-                        characteristic,
-                        &VIBRATION_STOP,
-                        btleplug::api::WriteType::WithoutResponse,
-                    ).await;
-                }
+                iqos.vibrate().await?;
 
                 Ok(())
             })

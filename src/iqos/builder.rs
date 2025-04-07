@@ -31,18 +31,12 @@ impl IQOSBuilder {
         }
     }
 
-    pub async fn with_peripheral(mut self, peripheral: Peripheral) -> Result<Self> {
-        self.peripheral = Some(peripheral);
+    pub async fn initialize(&mut self) -> Result<()> {
         
-        let services = self.discover_services().await?;
+        self.load_device_info().await?;
+        self.load_characteristics().await?;
         
-        // イテレータを使って効率的にチェック
-        if services.iter().any(|s| s.uuid == DEVICE_INFO_SERVICE_UUID) {
-            self.load_device_info().await?;
-            self.load_characteristics().await?;
-        }
-        
-        Ok(self)
+        Ok(())
     }
 
     pub async fn discover_services(&mut self) -> Result<BTreeSet<Service>> {

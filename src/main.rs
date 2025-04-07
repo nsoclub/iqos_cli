@@ -62,7 +62,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         iqos.connect().await?;
                         println!("Connected! Discovering services...");
                         let services = iqos.discover_services().await?;
-                        iqos.update_device_info().await?;
+                        iqos.initialize().await?;
                         
                         println!("発見されたサービス:");
                         if services.is_empty() {
