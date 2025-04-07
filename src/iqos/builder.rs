@@ -1,12 +1,10 @@
 use super::device::IQOS;
 use super::error::{IQOSError, Result};
 use super::{
-    DEVICE_INFO_SERVICE_UUID, MODEL_NUMBER_CHAR_UUID, 
-    SERIAL_NUMBER_CHAR_UUID, SOFTWARE_REVISION_CHAR_UUID,
-    MANUFACTURER_NAME_CHAR_UUID
+    BATTERY_CHARACTERISTIC_UUID, CORE_SERVICE_UUID, DEVICE_INFO_SERVICE_UUID, MANUFACTURER_NAME_CHAR_UUID, MODEL_NUMBER_CHAR_UUID, SERIAL_NUMBER_CHAR_UUID, SOFTWARE_REVISION_CHAR_UUID, SCP_CONTROL_CHARACTERISTIC_UUID
 };
 use btleplug::platform::Peripheral;
-use btleplug::api::{Service, Peripheral as _};
+use btleplug::api::{Characteristic, Peripheral as _, Service};
 use std::collections::BTreeSet;
 use uuid::Uuid;
 
@@ -16,6 +14,8 @@ pub struct IQOSBuilder {
     serialnumber: Option<String>,
     softwarerevision: Option<String>,
     manufacturername: Option<String>,
+    battery_characteristic: Option<Characteristic>,
+    scp_control_characteristic: Option<Characteristic>,
 }
 
 impl IQOSBuilder {
@@ -26,6 +26,8 @@ impl IQOSBuilder {
             serialnumber: None,
             softwarerevision: None,
             manufacturername: None,
+            battery_characteristic: None,
+            scp_control_characteristic: None,
         }
     }
 
@@ -36,7 +38,8 @@ impl IQOSBuilder {
         
         // イテレータを使って効率的にチェック
         if services.iter().any(|s| s.uuid == DEVICE_INFO_SERVICE_UUID) {
-            self.update_device_info().await?;
+            self.load_device_info().await?;
+            self.load_characteristics().await?;
         }
         
         Ok(self)
@@ -63,7 +66,6 @@ impl IQOSBuilder {
         Ok(())
     }
 
-
     pub async fn is_connected(&self) -> Result<bool> {
         let peripheral = self.peripheral
             .as_ref()
@@ -84,7 +86,7 @@ impl IQOSBuilder {
             .cloned())
     }
 
-    pub async fn update_device_info(&mut self) -> Result<()> {
+    async fn load_device_info(&mut self) -> Result<()> {
         let peripheral = self.peripheral
             .as_mut()
             .ok_or(IQOSError::ConfigurationError("Peripheral is required".to_string()))?;
@@ -129,32 +131,22 @@ impl IQOSBuilder {
         Ok(())
     }
 
-    pub async fn initialize(&mut self) -> Result<()> {
+    async fn load_characteristics(&mut self) -> Result<()> {
         let peripheral = self.peripheral
             .as_mut()
             .ok_or(IQOSError::ConfigurationError("Peripheral is required".to_string()))?;
         
-        // サービスを検出
-        peripheral.discover_services().await
-            .map_err(IQOSError::BleError)?;
-        
-        // デバイス情報を取得
-        if let Some(properties) = peripheral.properties().await
-            .map_err(IQOSError::BleError)? {
-            
-            if let Some(name) = properties.local_name {
-                self.modelnumber = Some(name.to_string());
+        if let Some(service) = peripheral.services().iter().find(|s| s.uuid == CORE_SERVICE_UUID) {
+            for characteristic in &service.characteristics {
+                let uuid = characteristic.uuid;
+                if uuid == BATTERY_CHARACTERISTIC_UUID {
+                    self.battery_characteristic = Some(characteristic.clone());
+                } else if uuid == SCP_CONTROL_CHARACTERISTIC_UUID {
+                    self.scp_control_characteristic = Some(characteristic.clone());
+                }
             }
-            
-            // 製造者情報の処理
-            let manufacturer_str = properties.manufacturer_data
-                .iter()
-                .map(|(id, data)| format!("ID: {}, Data: {:?}", id, data))
-                .collect::<Vec<_>>()
-                .join(", ");
-            self.manufacturername = Some(manufacturer_str);
         }
-
+        
         Ok(())
     }
 
@@ -168,6 +160,8 @@ impl IQOSBuilder {
             self.serialnumber.ok_or(IQOSError::ConfigurationError("Serial number is required".to_string()))?,
             self.softwarerevision.unwrap_or_else(|| "Unknown".to_string()),
             self.manufacturername.unwrap_or_else(|| "Unknown".to_string()),
+            self.battery_characteristic.ok_or(IQOSError::ConfigurationError("Battery characteristic is required".to_string()))?,
+            self.scp_control_characteristic.ok_or(IQOSError::ConfigurationError("SCP Control characteristic is required".to_string()))?,
         );
 
         Ok(iqos)

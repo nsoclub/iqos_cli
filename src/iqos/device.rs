@@ -17,6 +17,8 @@ pub struct IQOS {
     manufacturername: String,
     holder_battery_status: u8,
     peripheral: Peripheral,
+    battery_characteristic: Characteristic,
+    scp_control_characteristic: Characteristic,
 }
 
 impl IQOS {
@@ -26,6 +28,8 @@ impl IQOS {
         serialnumber: String,
         softwarerevision: String,
         manufacturername: String,
+        battery_characteristic: Characteristic,
+        scp_control_characteristic: Characteristic,
     ) -> Self {
         Self {
             peripheral,
@@ -34,6 +38,8 @@ impl IQOS {
             softwarerevision,
             manufacturername,
             holder_battery_status: 0,
+            battery_characteristic,
+            scp_control_characteristic,
         }
     }
 
@@ -61,14 +67,6 @@ impl IQOS {
         let peripheral = self.peripheral.clone();
 
         peripheral.disconnect().await.map_err(IQOSError::BleError)
-    }
-
-    async fn update_device_info(&mut self) -> Result<()> {
-        // ここでデバイスの情報を取得して各フィールドを更新
-        // モデル番号、シリアル番号、ソフトウェアバージョン、製造者名など
-        // 実際の実装はデバイスのプロトコルに依存します
-
-        Ok(())
     }
 
     pub async fn reload_battery(& mut self) -> Result<()> {
