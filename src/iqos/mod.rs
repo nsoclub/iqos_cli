@@ -1,11 +1,13 @@
 mod builder;
-mod device;
+mod iqos;
+mod iluma;
 mod error;
 
 use uuid::{uuid, Uuid};
 
 pub use builder::IQOSBuilder;
-pub use device::IQOS;
+pub use iqos::IQOS;
+pub use iluma::IlumaFeatures;
 
 // Service UUIDs
 pub const DEVICE_INFO_SERVICE_UUID: Uuid = uuid!("0000180a-0000-1000-8000-00805f9b34fb");

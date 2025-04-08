@@ -68,7 +68,7 @@ impl IQOSConsole {
             let iqos = console.iqos.clone();
             Box::pin(async move {
                 let iqos = iqos.lock().await;
-                iqos.lock().await?;
+                iqos.lock_device().await?;
                 println!("Locked the IQOS");
                 Ok(())
             })
@@ -78,7 +78,7 @@ impl IQOSConsole {
             let iqos = console.iqos.clone();
             Box::pin(async move {
                 let iqos = iqos.lock().await;
-                iqos.unlock().await?;
+                iqos.unlock_device().await?;
                 println!("Unlocked the IQOS");
                 Ok(())
             })

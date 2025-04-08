@@ -11,6 +11,26 @@ const LOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0x1c];
 const UNLOCK_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc9, 0x44, 0x04, 0x00, 0x00, 0x00, 0x00, 0x5d];
 const UNLOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0x1c];
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum IQOSModel {
+    One,
+    Iluma,
+}
+
+impl IQOSModel {
+    pub async fn from_peripheral(peripheral: Peripheral) -> Self {
+        if let Some(name) = peripheral.properties().await.unwrap().unwrap().local_name {
+            if name.contains("ONE") {
+                IQOSModel::One
+            } else {
+                IQOSModel::Iluma
+            }
+        } else {
+            IQOSModel::One
+        }
+    }
+}
+
 pub struct IQOS {
     modelnumber: String,
     serialnumber: String,
@@ -20,10 +40,11 @@ pub struct IQOS {
     peripheral: Peripheral,
     battery_characteristic: Characteristic,
     scp_control_characteristic: Characteristic,
+    model: IQOSModel,
 }
 
 impl IQOS {
-    pub(crate) fn new(
+    pub(crate) async fn new(
         peripheral: Peripheral,
         modelnumber: String,
         serialnumber: String,
@@ -32,6 +53,7 @@ impl IQOS {
         battery_characteristic: Characteristic,
         scp_control_characteristic: Characteristic,
     ) -> Self {
+        let model = IQOSModel::from_peripheral(peripheral.clone()).await;
         Self {
             peripheral,
             modelnumber,
@@ -41,6 +63,7 @@ impl IQOS {
             holder_battery_status: 0,
             battery_characteristic,
             scp_control_characteristic,
+            model,
         }
     }
 
@@ -52,6 +75,17 @@ impl IQOS {
         let peripheral = self.peripheral.clone();
 
         peripheral.disconnect().await.map_err(IQOSError::BleError)
+    }
+
+    pub fn as_iluma(&self) -> Option<&IQOS> {
+        match self.model {
+            IQOSModel::Iluma => Some(self),
+            _ => None,
+        }
+    }
+
+    pub fn is_iluma(&self) -> bool {
+        matches!(self.model, IQOSModel::Iluma)
     }
 
     pub async fn reload_battery(& mut self) -> Result<()> {
@@ -90,7 +124,7 @@ impl IQOS {
         Ok(())
     }
 
-    pub async fn lock(&self) -> Result<()> {
+    pub async fn lock_device(&self) -> Result<()> {
         let peripheral = &self.peripheral;
 
         peripheral.write(
@@ -114,7 +148,7 @@ impl IQOS {
         Ok(())
     }
 
-    pub async fn unlock(&self) -> Result<()> {
+    pub async fn unlock_device(&self) -> Result<()> {
         let peripheral = &self.peripheral;
 
         peripheral.write(
@@ -136,6 +170,14 @@ impl IQOS {
         ).await.map_err(IQOSError::BleError)?;
 
         Ok(())
+    }
+
+    pub(crate) fn peripheral(&self) -> &Peripheral {
+        &self.peripheral
+    }
+
+    pub(crate) fn scp_control_characteristic(&self) -> &Characteristic {
+        &self.scp_control_characteristic
     }
 }
 

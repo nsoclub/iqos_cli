@@ -1,4 +1,4 @@
-use super::device::IQOS;
+use super::iqos::IQOS;
 use super::error::{IQOSError, Result};
 use super::{
     BATTERY_CHARACTERISTIC_UUID, CORE_SERVICE_UUID, DEVICE_INFO_SERVICE_UUID, MANUFACTURER_NAME_CHAR_UUID, MODEL_NUMBER_CHAR_UUID, SERIAL_NUMBER_CHAR_UUID, SOFTWARE_REVISION_CHAR_UUID, SCP_CONTROL_CHARACTERISTIC_UUID
@@ -144,7 +144,7 @@ impl IQOSBuilder {
         Ok(())
     }
 
-    pub fn build(self) -> Result<IQOS> {
+    pub async fn build(self) -> Result<IQOS> {
         let peripheral = self.peripheral
             .ok_or(IQOSError::ConfigurationError("Peripheral is required".to_string()))?;
 
@@ -156,7 +156,7 @@ impl IQOSBuilder {
             self.manufacturername.unwrap_or_else(|| "Unknown".to_string()),
             self.battery_characteristic.ok_or(IQOSError::ConfigurationError("Battery characteristic is required".to_string()))?,
             self.scp_control_characteristic.ok_or(IQOSError::ConfigurationError("SCP Control characteristic is required".to_string()))?,
-        );
+        ).await;
 
         Ok(iqos)
     }

@@ -129,7 +129,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             }
                         }
 
-                        let iqos = iqos.build()?;
+                        let iqos = iqos.build().await?;
                         // コンソールを起動して対話的な操作を開始
                         run_console(iqos).await?;
                         
