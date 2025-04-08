@@ -17,6 +17,15 @@ pub enum IQOSModel {
     Iluma,
 }
 
+impl std::fmt::Display for IQOSModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IQOSModel::One => write!(f, "ONE"),
+            IQOSModel::Iluma => write!(f, "ILUMA"),
+        }
+    }
+}
+
 impl IQOSModel {
     pub async fn from_peripheral(peripheral: Peripheral) -> Self {
         if let Some(name) = peripheral.properties().await.unwrap().unwrap().local_name {
@@ -185,8 +194,8 @@ impl fmt::Display for IQOS {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Model Number: {}\nSerial Number: {}\nSoftware Revision: {}\nManufacture Name: {}",
-            self.modelnumber, self.serialnumber, self.softwarerevision, self.manufacturername,
+            "Model: {}\nModel Number: {}\nSerial Number: {}\nSoftware Revision: {}\nManufacture Name: {}",
+            self.model, self.modelnumber, self.serialnumber, self.softwarerevision, self.manufacturername,
         )
     }
 }
