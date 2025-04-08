@@ -11,6 +11,8 @@ pub enum BrightnessLevel {
 
 pub trait IlumaFeatures: Send + Sync {
     async fn update_brightness(&self, level: BrightnessLevel) -> Result<()>;
+    async fn update_autostart(&self, enable: bool) -> Result<()>;
+    async fn update_smartgesture(&self, enable: bool) -> Result<()>;
 }
 
 const BRIGHTNESS_HIGH_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc0, 0x46, 0x23, 0x64, 0x00, 0x00, 0x00, 0x4f];
@@ -19,6 +21,12 @@ const BRIGHTNESS_HIGH_SIGNAL_THIRD: [u8; 9] = [0x00, 0xc9, 0x44, 0x24, 0x64, 0x0
 const BRIGHTNESS_LOW_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc0, 0x46, 0x23, 0x1e, 0x00, 0x00, 0x00, 0xe1];
 const BRIGHTNESS_LOW_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc0, 0x02, 0x23, 0xc3];
 const BRIGHTNESS_LOW_SIGNAL_THIRD: [u8; 9] = [0x00, 0xc9, 0x44, 0x24, 0x1e, 0x00, 0x00, 0x00, 0x9a];
+
+const AUTOSTART_ENABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x01, 0x01, 0x00, 0x00, 0x3f];
+const AUTOSTART_DISABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x01, 0x00, 0x00, 0x00, 0x54];
+
+const SMARTGESTURE_ENABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x04, 0x01, 0x00, 0x00, 0x3c];
+const SMARTGESTURE_DISABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x04, 0x00, 0x00, 0x00, 0x57];
 
 #[derive(Debug)]
 pub struct NotIlumaError;
@@ -78,6 +86,46 @@ impl IlumaFeatures for IQOS {
                 WriteType::WithResponse,
             ).await.map_err(IQOSError::BleError)?;
         }
+
+        Ok(())
+    }
+
+    async fn update_autostart(&self, enable: bool) -> Result<()> {
+        if !self.is_iluma() {
+            return Err(IQOSError::NotIluma(NotIlumaError));
+        }
+
+        let signal = if enable {
+            AUTOSTART_ENABLE_SIGNAL
+        } else {
+            AUTOSTART_DISABLE_SIGNAL
+        };
+
+        self.peripheral().write(
+            self.scp_control_characteristic(),
+            &signal,
+            WriteType::WithResponse,
+        ).await.map_err(IQOSError::BleError)?;
+
+        Ok(())
+    }
+
+    async fn update_smartgesture(&self, enable: bool) -> Result<()> {
+        if !self.is_iluma() {
+            return Err(IQOSError::NotIluma(NotIlumaError));
+        }
+
+        let signal = if enable {
+            SMARTGESTURE_ENABLE_SIGNAL
+        } else {
+            SMARTGESTURE_DISABLE_SIGNAL
+        };
+
+        self.peripheral().write(
+            self.scp_control_characteristic(),
+            &signal,
+            WriteType::WithResponse,
+        ).await.map_err(IQOSError::BleError)?;
 
         Ok(())
     }

@@ -9,6 +9,7 @@ pub enum IQOSError {
     BleError(BleError),
     NotIluma(NotIlumaError),
     ConfigurationError(String),
+    AutoStartError(String),
 }
 
 impl fmt::Display for IQOSError {
@@ -17,6 +18,7 @@ impl fmt::Display for IQOSError {
             IQOSError::BleError(err) => write!(f, "Bluetooth error: {}", err),
             IQOSError::NotIluma(err) => write!(f, "{}", err),
             IQOSError::ConfigurationError(msg) => write!(f, "Configuration error: {}", msg),
+            IQOSError::AutoStartError(msg) => write!(f, "AutoStart error: {}", msg),
         }
     }
 }
@@ -27,6 +29,7 @@ impl Error for IQOSError {
             IQOSError::BleError(err) => Some(err),
             IQOSError::NotIluma(err) => Some(err),
             IQOSError::ConfigurationError(_) => None,
+            IQOSError::AutoStartError(_) => None,
         }
     }
 }

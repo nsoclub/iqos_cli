@@ -116,14 +116,48 @@ impl IQOSConsole {
             })
         }));
         
-        commands.insert("smartgesture".to_string(), Box::new(|_console: &IQOSConsole, args| {
-            let args = args.clone();
+        commands.insert("smartgesture".to_string(), Box::new(|console: &IQOSConsole, args| {
+            let iqos = console.iqos.clone();
             Box::pin(async move {
-                match args.get(1).map(|s| s.as_str()) {
-                    Some("enable") => println!("スマートジェスチャーを有効にしました"),
-                    Some("disable") => println!("スマートジェスチャーを無効にしました"),
-                    Some(opt) => println!("無効なオプション: {}。'enable'または'disable'を指定してください", opt),
-                    None => println!("使い方: smartgesture [enable|disable]"),
+                let iqos = iqos.lock().await;
+                if let Some(iluma) = iqos.as_iluma() {
+                    match args.get(1).map(|s| s.as_str()) {
+                        Some("enable") => {
+                            iluma.update_smartgesture(true).await?;
+                            println!("スマートジェスチャーを有効にしました");
+                        },
+                        Some("disable") => {
+                            iluma.update_smartgesture(false).await?;
+                            println!("スマートジェスチャーを無効にしました");
+                        },
+                        Some(opt) => println!("無効なオプション: {}。'enable'または'disable'を指定してください", opt),
+                        None => println!("使い方: smartgesture [enable|disable]"),
+                    }
+                } else {
+                    println!("このデバイスはILUMAモデルではありません");
+                }
+                Ok(())
+            })
+        }));
+
+        commands.insert("autostart".to_string(), Box::new(|console: &IQOSConsole, args| {
+            let iqos = console.iqos.clone();
+            Box::pin(async move {
+                let iqos = iqos.lock().await;
+                if let Some(arg) = args.get(1) {
+                    match arg.to_lowercase() {
+                        s if s == "on" || s == "enable" => {
+                            iqos.update_autostart(true).await?;
+                            println!("Autostart enabled");
+                        },
+                        s if s == "off" || s == "disable" => {
+                            iqos.update_autostart(false).await?;
+                            println!("Autostart disabled");
+                        },
+                        _ => println!("使い方: autostart [on|off]"),
+                    }
+                } else {
+                    println!("使い方: autostart [on|off]");
                 }
                 Ok(())
             })
@@ -132,11 +166,12 @@ impl IQOSConsole {
         commands.insert("help".to_string(), Box::new(|_console: &IQOSConsole, _| {
             Box::pin(async move {
                 println!("利用可能なコマンド:");
-                println!("  brightness [high|medium|low] - 明るさを設定します");
+                println!("  brightness [high|low] - 明るさを設定します");
                 println!("  battery - バッテリーの状態を表示します");
                 println!("  lock | unlock - デバイスをロックまたはアンロックします");
                 println!("  findmyiqos - デバイスを探す機能を起動します");
-                println!("  smartgesture [enable|disable] - スマートジェスチャー機能を設定します");
+                println!("  autostart [on|off] - オートスタート機能を設定します");
+                println!("  smartgesture [enable|disable] - スマートジェスチャー機能を設定します（ILUMAモデルのみ）");
                 println!("  info - デバイスのステータスを表示します");
                 println!("  help - このヘルプメッセージを表示します");
                 println!("  quit | exit - プログラムを終了します");
