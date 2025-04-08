@@ -1,5 +1,4 @@
 use btleplug::api::{Peripheral as _, WriteType};
-use futures::stream::ForEach;
 
 use crate::iqos::IQOS;
 use crate::iqos::error::{IQOSError, Result};
@@ -15,7 +14,11 @@ pub trait IlumaFeatures: Send + Sync {
 }
 
 const BRIGHTNESS_HIGH_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc0, 0x46, 0x23, 0x64, 0x00, 0x00, 0x00, 0x4f];
+const BRIGHTNESS_HIGH_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc0, 0x02, 0x23, 0xc3];
+const BRIGHTNESS_HIGH_SIGNAL_THIRD: [u8; 9] = [0x00, 0xc9, 0x44, 0x24, 0x64, 0x00, 0x00, 0x00, 0x34];
 const BRIGHTNESS_LOW_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc0, 0x46, 0x23, 0x1e, 0x00, 0x00, 0x00, 0xe1];
+const BRIGHTNESS_LOW_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc0, 0x02, 0x23, 0xc3];
+const BRIGHTNESS_LOW_SIGNAL_THIRD: [u8; 9] = [0x00, 0xc9, 0x44, 0x24, 0x1e, 0x00, 0x00, 0x00, 0x9a];
 
 #[derive(Debug)]
 pub struct NotIlumaError;
@@ -28,6 +31,27 @@ impl std::fmt::Display for NotIlumaError {
 
 impl std::error::Error for NotIlumaError {}
 
+impl std::str::FromStr for BrightnessLevel {
+    type Err = IQOSError;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            "high" => Ok(BrightnessLevel::High),
+            "low" => Ok(BrightnessLevel::Low),
+            _ => Err(IQOSError::ConfigurationError("Invalid brightness level".to_string())),
+        }
+    }
+}
+
+impl std::fmt::Display for BrightnessLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BrightnessLevel::High => write!(f, "high"),
+            BrightnessLevel::Low => write!(f, "low"),
+        }
+    }
+}
+
 impl IlumaFeatures for IQOS {
     async fn update_brightness(&self, level: BrightnessLevel) -> Result<()> {
         if !self.is_iluma() {
@@ -35,8 +59,16 @@ impl IlumaFeatures for IQOS {
         }
 
         let signals: Vec<Vec<u8>> = match level {
-            BrightnessLevel::High => vec!(BRIGHTNESS_HIGH_SIGNAL_FIRST.to_vec(),),
-            BrightnessLevel::Low => vec!(BRIGHTNESS_LOW_SIGNAL_FIRST.to_vec(),),
+            BrightnessLevel::High => vec!(
+                BRIGHTNESS_HIGH_SIGNAL_FIRST.to_vec(),
+                BRIGHTNESS_HIGH_SIGNAL_SECOND.to_vec(),
+                BRIGHTNESS_HIGH_SIGNAL_THIRD.to_vec(),
+            ),
+            BrightnessLevel::Low => vec!(
+                BRIGHTNESS_LOW_SIGNAL_FIRST.to_vec(),
+                BRIGHTNESS_LOW_SIGNAL_SECOND.to_vec(),
+                BRIGHTNESS_LOW_SIGNAL_THIRD.to_vec(),
+            ),
         };
 
         for signal in signals {

@@ -11,9 +11,10 @@ use std::future::Future;
 mod iqoshelper;
 use iqoshelper::IqosHelper;
 
-use crate::iqos::{self, IQOS};
+use crate::iqos::{IQOS, BrightnessLevel, IlumaFeatures};
 
-type CommandFn = Box<dyn Fn(&IQOSConsole, &[&str]) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
+// クロージャーの型定義を修正
+type CommandFn = Box<dyn Fn(&IQOSConsole, Vec<String>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
 
 #[derive(Clone)]
 pub struct IQOSConsole {
@@ -51,14 +52,22 @@ impl IQOSConsole {
             })
         }));
 
-        commands.insert("brightness".to_string(), Box::new(|_console: &IQOSConsole, args| {
-            let args: Vec<String> = args.iter().map(|&s| s.to_string()).collect();
+        commands.insert("brightness".to_string(), Box::new(|console: &IQOSConsole, args| {
+            let iqos = console.iqos.clone();
+            let args = args.clone();
             Box::pin(async move {
-                match args.get(1).map(|s| s.as_str()) {
-                    Some("high") => println!("明るさを高に設定しました"),
-                    Some("low") => println!("明るさを低に設定しました"),
-                    Some(opt) => println!("無効なオプション: {}。'high', 'low' のいずれかを指定してください", opt),
-                    None => println!("使い方: brightness [high|medium|low]"),
+                let iqos = iqos.lock().await;
+                match args.get(1).map(|s| s.parse::<BrightnessLevel>()) {
+                    Some(Ok(level)) => {
+                        if iqos.is_iluma() {
+                            iqos.update_brightness(level).await?;
+                            println!("明るさを{}に設定しました", level);
+                        } else {
+                            println!("このデバイスはILUMAモデルではありません");
+                        }
+                    },
+                    Some(Err(e)) => println!("{}", e),
+                    None => println!("使い方: brightness [high|low]"),
                 }
                 Ok(())
             })
@@ -108,7 +117,7 @@ impl IQOSConsole {
         }));
         
         commands.insert("smartgesture".to_string(), Box::new(|_console: &IQOSConsole, args| {
-            let args: Vec<String> = args.iter().map(|&s| s.to_string()).collect();
+            let args = args.clone();
             Box::pin(async move {
                 match args.get(1).map(|s| s.as_str()) {
                     Some("enable") => println!("スマートジェスチャーを有効にしました"),
@@ -146,7 +155,11 @@ impl IQOSConsole {
     }
     
     async fn execute(&self, line: &str) -> Result<bool> {
-        let args: Vec<&str> = line.trim().split_whitespace().collect();
+        let args: Vec<String> = line.trim()
+            .split_whitespace()
+            .map(|s| s.to_string())
+            .collect();
+
         if args.is_empty() {
             return Ok(true);
         }
@@ -160,7 +173,7 @@ impl IQOSConsole {
         }
         
         if let Some(handler) = self.commands.lock().await.get(&cmd) {
-            handler(self, &args).await?;
+            handler(self, args).await?;
         } else {
             println!("不明なコマンド: {}。'help'で利用可能なコマンドを表示します。", cmd);
         }
