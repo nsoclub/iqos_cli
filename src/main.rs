@@ -66,8 +66,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             return Ok(());
                         } else if input.trim().to_lowercase() == "n" {
                             ignore_devices.push(addr.clone());
+                            println!("Scanning for other devices...");
                             break;
                         }
+                        continue
                     }
                 }
             }
