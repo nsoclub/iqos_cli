@@ -2,6 +2,8 @@ mod builder;
 mod iqos;
 pub mod iluma;  // モジュールを公開
 mod error;
+#[cfg(test)]
+mod tests;
 
 use uuid::{uuid, Uuid};
 

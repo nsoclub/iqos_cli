@@ -10,6 +10,7 @@ pub enum IQOSError {
     NotIluma(NotIlumaError),
     ConfigurationError(String),
     AutoStartError(String),
+    AdapterError(String),
 }
 
 impl fmt::Display for IQOSError {
@@ -19,6 +20,7 @@ impl fmt::Display for IQOSError {
             IQOSError::NotIluma(err) => write!(f, "{}", err),
             IQOSError::ConfigurationError(msg) => write!(f, "Configuration error: {}", msg),
             IQOSError::AutoStartError(msg) => write!(f, "AutoStart error: {}", msg),
+            IQOSError::AdapterError(msg) => write!(f, "Adapter error: {}", msg),
         }
     }
 }
@@ -30,7 +32,20 @@ impl Error for IQOSError {
             IQOSError::NotIluma(err) => Some(err),
             IQOSError::ConfigurationError(_) => None,
             IQOSError::AutoStartError(_) => None,
+            IQOSError::AdapterError(_) => None,
         }
+    }
+}
+
+impl From<btleplug::Error> for IQOSError {
+    fn from(error: btleplug::Error) -> Self {
+        IQOSError::BleError(error)
+    }
+}
+
+impl From<&str> for IQOSError {
+    fn from(error: &str) -> Self {
+        IQOSError::AdapterError(error.to_string())
     }
 }
 
