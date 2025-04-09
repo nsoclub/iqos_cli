@@ -18,7 +18,6 @@ async fn get_central(manager: &Manager) -> Adapter {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // let mut iqos = iqos::IQOS::new();
     let mut iqos: iqos::IQOSBuilder;
     let manager = Manager::new().await.unwrap();
 
@@ -66,7 +65,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             run_console(iqos).await?;
                             return Ok(());
                         } else if input.trim().to_lowercase() == "n" {
-                            ignore_devices.push(addr);
+                            ignore_devices.push(addr.clone());
                             break;
                         }
                     }
