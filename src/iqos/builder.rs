@@ -1,5 +1,6 @@
-use super::iqos::IQOS;
+use super::iqos::{IQOSModel, IqosBle};
 use super::error::{IQOSError, Result};
+use super::device::{Iqos, IqosIluma};
 use super::{
     BATTERY_CHARACTERISTIC_UUID, CORE_SERVICE_UUID, DEVICE_INFO_SERVICE_UUID, MANUFACTURER_NAME_CHAR_UUID, MODEL_NUMBER_CHAR_UUID, SERIAL_NUMBER_CHAR_UUID, SOFTWARE_REVISION_CHAR_UUID, SCP_CONTROL_CHARACTERISTIC_UUID
 };
@@ -144,11 +145,11 @@ impl IQOSBuilder {
         Ok(())
     }
 
-    pub async fn build(self) -> Result<IQOS> {
+    pub async fn build(self) -> Result<IqosBle> {
         let peripheral = self.peripheral
             .ok_or(IQOSError::ConfigurationError("Peripheral is required".to_string()))?;
 
-        let iqos = IQOS::new(
+        let iqos = IqosBle::new(
             peripheral,
             self.modelnumber.unwrap_or_else(|| "Unknown".to_string()),
             self.serialnumber.ok_or(IQOSError::ConfigurationError("Serial number is required".to_string()))?,

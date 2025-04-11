@@ -1,7 +1,8 @@
 use super::error::{IQOSError, Result};
+use super::device::Iqos;
+use super::COMMAND_CHECKSUM_XOR;
 use btleplug::api::{Characteristic, Peripheral as _, WriteType};
 use btleplug::platform::Peripheral;
-use std::fmt;
 
 const CONFIRMATION_SIGNAL: [u8; 5] = [0x00, 0xc0, 0x01, 0x00, 0x15];
 const START_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x00, 0xc3];
@@ -27,20 +28,22 @@ impl std::fmt::Display for IQOSModel {
 }
 
 impl IQOSModel {
-    pub async fn from_peripheral(peripheral: Peripheral) -> Self {
-        if let Some(name) = peripheral.properties().await.unwrap().unwrap().local_name {
-            if name.contains("ONE") {
-                IQOSModel::One
-            } else {
-                IQOSModel::Iluma
+    pub async fn from_peripheral(peripheral: &Peripheral) -> Self {
+        if let Ok(properties) = peripheral.properties().await {
+            if let Some(properties) = properties {
+                if let Some(name) = properties.local_name {
+                    if name.contains("ONE") {
+                        return IQOSModel::One;
+                    }
+                }
             }
-        } else {
-            IQOSModel::One
         }
+        IQOSModel::Iluma // デフォルトはIlumaとする
     }
 }
 
-pub struct IQOS {
+
+pub struct IqosBle {
     modelnumber: String,
     serialnumber: String,
     softwarerevision: String,
@@ -52,7 +55,7 @@ pub struct IQOS {
     model: IQOSModel,
 }
 
-impl IQOS {
+impl IqosBle {
     pub(crate) async fn new(
         peripheral: Peripheral,
         modelnumber: String,
@@ -62,7 +65,7 @@ impl IQOS {
         battery_characteristic: Characteristic,
         scp_control_characteristic: Characteristic,
     ) -> Self {
-        let model = IQOSModel::from_peripheral(peripheral.clone()).await;
+        let model = IQOSModel::from_peripheral(&peripheral).await;
         Self {
             peripheral,
             modelnumber,
@@ -76,17 +79,27 @@ impl IQOS {
         }
     }
 
-    pub fn battery_status(&self) -> u8 {
-        self.holder_battery_status
+    async fn send_command(&self, command: Vec<u8>) -> Result<()> {
+        let peripheral = &self.peripheral;
+        
+        peripheral.write(
+            &self.scp_control_characteristic,
+            &self.with_checksum(command),
+            WriteType::WithResponse,
+        ).await.map_err(IQOSError::BleError)?;
+        
+        Ok(())
+    }
+    
+
+    pub async fn send_command_sequence(&self, commands: Vec<Vec<u8>>) -> Result<()> {
+        for command in commands {
+            self.send_command(command).await?;
+        }
+        Ok(())
     }
 
-    pub async fn disconnect(&mut self) -> Result<()> {
-        let peripheral = self.peripheral.clone();
-
-        peripheral.disconnect().await.map_err(IQOSError::BleError)
-    }
-
-    pub fn as_iluma(&self) -> Option<&IQOS> {
+    pub fn as_iluma(&self) -> Option<&IqosBle> {
         match self.model {
             IQOSModel::Iluma => Some(self),
             _ => None,
@@ -97,7 +110,44 @@ impl IQOS {
         matches!(self.model, IQOSModel::Iluma)
     }
 
-    pub async fn reload_battery(& mut self) -> Result<()> {
+    pub fn model(&self) -> &IQOSModel {
+        &self.model
+    }
+
+    // フィールド名と同じ名前のgetterメソッド
+    pub(crate) fn peripheral(&self) -> &Peripheral {
+        &self.peripheral
+    }
+
+    pub(crate) fn scp_control_characteristic(&self) -> &Characteristic {
+        &self.scp_control_characteristic
+    }
+
+    pub(crate) fn battery_characteristic(&self) -> &Characteristic {
+        &self.battery_characteristic
+    }
+
+    fn calculate_checksum(&self, command: &Vec<u8>) -> u8 {
+        let sum: u8 = command.iter().fold(0u8, |acc, &x| acc.wrapping_add(x));
+        
+        sum ^ COMMAND_CHECKSUM_XOR
+    }
+
+    pub fn with_checksum(&self, command: Vec<u8>) -> Vec<u8> {
+        let mut cmd = command;
+        let checksum = self.calculate_checksum(&cmd);
+        cmd.push(checksum);
+        cmd
+    }
+
+}
+
+impl Iqos for IqosBle {
+    async fn disconnect(&mut self) -> Result<()> {
+        self.peripheral.disconnect().await.map_err(IQOSError::BleError)
+    }
+    
+    async fn reload_battery(&mut self) -> Result<()> {
         let peripheral = &self.peripheral;
 
         if let Ok(data) = peripheral.read(&self.battery_characteristic)
@@ -108,8 +158,12 @@ impl IQOS {
             }
         Ok(())
     }
-
-    pub async fn vibrate(&self) -> Result<()> {
+    
+    fn battery_status(&self) -> u8 {
+        self.holder_battery_status
+    }
+    
+    async fn vibrate(&self) -> Result<()> {
         let peripheral = &self.peripheral;
 
         peripheral.write(
@@ -120,8 +174,8 @@ impl IQOS {
 
         Ok(())
     }
-
-    pub async fn stop_vibrate(&self) -> Result<()> {
+    
+    async fn stop_vibrate(&self) -> Result<()> {
         let peripheral = &self.peripheral;
 
         peripheral.write(
@@ -132,8 +186,8 @@ impl IQOS {
 
         Ok(())
     }
-
-    pub async fn lock_device(&self) -> Result<()> {
+    
+    async fn lock_device(&self) -> Result<()> {
         let peripheral = &self.peripheral;
 
         peripheral.write(
@@ -156,8 +210,8 @@ impl IQOS {
 
         Ok(())
     }
-
-    pub async fn unlock_device(&self) -> Result<()> {
+    
+    async fn unlock_device(&self) -> Result<()> {
         let peripheral = &self.peripheral;
 
         peripheral.write(
@@ -180,22 +234,18 @@ impl IQOS {
 
         Ok(())
     }
-
-    pub(crate) fn peripheral(&self) -> &Peripheral {
-        &self.peripheral
-    }
-
-    pub(crate) fn scp_control_characteristic(&self) -> &Characteristic {
-        &self.scp_control_characteristic
-    }
 }
 
-impl fmt::Display for IQOS {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for IqosBle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Model: {}\nModel Number: {}\nSerial Number: {}\nSoftware Revision: {}\nManufacture Name: {}",
-            self.model, self.modelnumber, self.serialnumber, self.softwarerevision, self.manufacturername,
+            "Model: {}\nModel Number: {}\nSerial Number: {}\nSoftware Revision: {}\nManufacturer Name: {}\n",
+            self.model,
+            self.modelnumber,
+            self.serialnumber,
+            self.softwarerevision,
+            self.manufacturername,
         )
     }
 }

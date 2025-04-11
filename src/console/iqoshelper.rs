@@ -18,6 +18,7 @@ impl IqosHelper {
             "brightness".to_string(),
             "findmyiqos".to_string(),
             "smartgesture".to_string(),
+            "vibration".to_string(),
             "help".to_string(),
             "exit".to_string(),
             "info".to_string(),
@@ -84,10 +85,29 @@ impl Completer for IqosHelper {
                     .filter(|sc| sc.starts_with(subcmd))
                     .map(|sc| Pair { display: sc.to_string(), replacement: sc.to_string() })
                     .collect(),
+                
+                "vibration" => vec!["charge", "heating", "starting", "terminated", "puffend"]
+                    .iter()
+                    .filter(|sc| sc.starts_with(subcmd))
+                    .map(|sc| Pair { display: sc.to_string(), replacement: sc.to_string() })
+                    .collect(),
                     
                 _ => vec![],
             };
             
+            return Ok((start, candidates));
+        }
+        
+        if args.len() == 3 && args[0] == "vibration" {
+            let option_value = args[2];
+            let start = line.len() - option_value.len();
+            
+            let candidates: Vec<Pair> = vec!["on", "off"]
+                .iter()
+                .filter(|val| val.starts_with(option_value))
+                .map(|val| Pair { display: val.to_string(), replacement: val.to_string() })
+                .collect();
+                
             return Ok((start, candidates));
         }
         

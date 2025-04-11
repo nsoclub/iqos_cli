@@ -10,6 +10,7 @@ mod iqos;
 mod console;
 
 use console::run_console;
+use iqos::{Iqos, IqosIluma, IqosBle};
 
 async fn get_central(manager: &Manager) -> Adapter {
     let adapters = manager.adapters().await.unwrap();
@@ -18,7 +19,7 @@ async fn get_central(manager: &Manager) -> Adapter {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let mut iqos: iqos::IQOSBuilder;
+    let mut iqos_builder: iqos::IQOSBuilder;
     let manager = Manager::new().await.unwrap();
 
     // get the first bluetooth adapter
@@ -43,7 +44,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     .unwrap_or_default();
 
                 if name.contains("IQOS") && !ignore_devices.contains(&addr) {
-                    iqos = iqos::IQOSBuilder::new(peripheral);
+                    iqos_builder = iqos::IQOSBuilder::new(peripheral);
 
                     println!("Found IQOS: {name} ({addr})");
                     
@@ -55,12 +56,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                         if input.trim().to_lowercase() == "y" {
                             println!("Connecting to IQOS device...");
-                            iqos.connect().await?;
+                            iqos_builder.connect().await?;
                             println!("Connected!");
-                            let _services = iqos.discover_services().await?;
-                            iqos.initialize().await?;
+                            let _services = iqos_builder.discover_services().await?;
+                            iqos_builder.initialize().await?;
 
-                            let iqos = iqos.build().await?;
+                            let iqos = iqos_builder.build().await?;
                             central.stop_scan().await?;
                             run_console(iqos).await?;
                             return Ok(());

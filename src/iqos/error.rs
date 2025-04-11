@@ -11,6 +11,7 @@ pub enum IQOSError {
     ConfigurationError(String),
     AutoStartError(String),
     AdapterError(String),
+    IncompatibleModelError, // 互換性エラーを追加
 }
 
 impl fmt::Display for IQOSError {
@@ -21,6 +22,7 @@ impl fmt::Display for IQOSError {
             IQOSError::ConfigurationError(msg) => write!(f, "Configuration error: {}", msg),
             IQOSError::AutoStartError(msg) => write!(f, "AutoStart error: {}", msg),
             IQOSError::AdapterError(msg) => write!(f, "Adapter error: {}", msg),
+            IQOSError::IncompatibleModelError => write!(f, "Incompatible model error"),
         }
     }
 }
@@ -33,6 +35,7 @@ impl Error for IQOSError {
             IQOSError::ConfigurationError(_) => None,
             IQOSError::AutoStartError(_) => None,
             IQOSError::AdapterError(_) => None,
+            IQOSError::IncompatibleModelError => None,
         }
     }
 }
