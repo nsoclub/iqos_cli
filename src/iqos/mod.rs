@@ -3,10 +3,11 @@ mod iqos;
 pub mod iluma;  // モジュールを公開
 mod error;
 mod device;  // 新しいモジュールを追加
-#[cfg(test)]
-mod tests;
 
 use uuid::{uuid, Uuid};
+
+#[cfg(test)]
+mod tests;
 
 pub use builder::IQOSBuilder;
 pub use iqos::IqosBle;

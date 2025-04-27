@@ -4,13 +4,18 @@ use super::COMMAND_CHECKSUM_XOR;
 use btleplug::api::{Characteristic, Peripheral as _, WriteType};
 use btleplug::platform::Peripheral;
 
-const CONFIRMATION_SIGNAL: [u8; 5] = [0x00, 0xc0, 0x01, 0x00, 0x15];
-const START_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x00, 0xc3];
-const STOP_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x00, 0x1e, 0x00, 0x00, 0xd5];
-const LOCK_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc9, 0x44, 0x04, 0x02, 0xff, 0x00, 0x00, 0x5a];
-const LOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0x1c];
-const UNLOCK_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc9, 0x44, 0x04, 0x00, 0x00, 0x00, 0x00, 0x5d];
-const UNLOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0x1c];
+// チェックサム修正済みのコマンド定数
+pub const CONFIRMATION_SIGNAL: [u8; 5] = [0x00, 0xc0, 0x01, 0x00, 0xF6];
+// pub const START_VIBRATE_SIGNAL: [u8; 8] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x65];
+pub const START_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x00, 0xc3];
+// pub const STOP_VIBRATE_SIGNAL: [u8; 8] = [0x00, 0xc0, 0x45, 0x22, 0x00, 0x1e, 0x00, 0x64];
+pub const STOP_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x00, 0x1e, 0x00, 0x00, 0xd5];
+pub const LOCK_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc9, 0x44, 0x04, 0x02, 0xff, 0x00, 0x00, 0x5a];
+// pub const LOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0xC0];
+pub const LOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0x1c];
+pub const UNLOCK_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc9, 0x44, 0x04, 0x00, 0x00, 0x00, 0x00, 0x5d];
+// pub const UNLOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0xC0];
+pub const UNLOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0x1c];
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum IQOSModel {
@@ -84,18 +89,22 @@ impl IqosBle {
         
         peripheral.write(
             &self.scp_control_characteristic,
-            &self.with_checksum(command),
+            &command,
             WriteType::WithResponse,
         ).await.map_err(IQOSError::BleError)?;
         
         Ok(())
     }
     
-
-    pub async fn send_command_sequence(&self, commands: Vec<Vec<u8>>) -> Result<()> {
+    pub async fn send_command_vec(&self, commands: Vec<Vec<u8>>) -> Result<()> {
         for command in commands {
             self.send_command(command).await?;
         }
+        Ok(())
+    }
+
+    pub async fn send_confirm(&self) -> Result<()> {
+        self.send_command(CONFIRMATION_SIGNAL.to_vec()).await?;
         Ok(())
     }
 
@@ -127,16 +136,20 @@ impl IqosBle {
         &self.battery_characteristic
     }
 
-    fn calculate_checksum(&self, command: &Vec<u8>) -> u8 {
+    // チェックサム計算と追加をpubに変更してテストから再利用可能に
+    pub fn calculate_checksum(&self, command: &Vec<u8>) -> u8 {
         let sum: u8 = command.iter().fold(0u8, |acc, &x| acc.wrapping_add(x));
         
+        println!("Checksum: {}", sum ^ COMMAND_CHECKSUM_XOR);
         sum ^ COMMAND_CHECKSUM_XOR
     }
 
     pub fn with_checksum(&self, command: Vec<u8>) -> Vec<u8> {
         let mut cmd = command;
         let checksum = self.calculate_checksum(&cmd);
+        println!("orig: {:?}", [0x00, 0xc9, 0x44, 0x04, 0x02, 0xff, 0x00, 0x00, 0x5a]);
         cmd.push(checksum);
+        println!("calc: {:?}", &cmd);
         cmd
     }
 
@@ -164,74 +177,24 @@ impl Iqos for IqosBle {
     }
     
     async fn vibrate(&self) -> Result<()> {
-        let peripheral = &self.peripheral;
-
-        peripheral.write(
-            &self.scp_control_characteristic,
-            &START_VIBRATE_SIGNAL,
-            WriteType::WithResponse,
-        ).await.map_err(IQOSError::BleError)?;
-
+        self.send_command(START_VIBRATE_SIGNAL.to_vec()).await?;
         Ok(())
     }
     
     async fn stop_vibrate(&self) -> Result<()> {
-        let peripheral = &self.peripheral;
-
-        peripheral.write(
-            &self.scp_control_characteristic,
-            &STOP_VIBRATE_SIGNAL,
-            WriteType::WithResponse,
-        ).await.map_err(IQOSError::BleError)?;
-
+        self.send_command(STOP_VIBRATE_SIGNAL.to_vec()).await?;
         Ok(())
     }
     
     async fn lock_device(&self) -> Result<()> {
-        let peripheral = &self.peripheral;
-
-        peripheral.write(
-            &self.scp_control_characteristic,
-            &LOCK_SIGNAL_FIRST,
-            WriteType::WithResponse,
-        ).await.map_err(IQOSError::BleError)?;
-
-        peripheral.write(
-            &self.scp_control_characteristic,
-            &LOCK_SIGNAL_SECOND,
-            WriteType::WithResponse,
-        ).await.map_err(IQOSError::BleError)?;
-
-        peripheral.write(
-            &self.scp_control_characteristic,
-            &CONFIRMATION_SIGNAL,
-            WriteType::WithResponse,
-        ).await.map_err(IQOSError::BleError)?;
-
+        self.send_command_vec(vec!(LOCK_SIGNAL_FIRST.to_vec(), LOCK_SIGNAL_SECOND.to_vec())).await?;
+        self.send_confirm().await?;
         Ok(())
     }
     
     async fn unlock_device(&self) -> Result<()> {
-        let peripheral = &self.peripheral;
-
-        peripheral.write(
-            &self.scp_control_characteristic,
-            &UNLOCK_SIGNAL_FIRST,
-            WriteType::WithResponse,
-        ).await.map_err(IQOSError::BleError)?;
-
-        peripheral.write(
-            &self.scp_control_characteristic,
-            &UNLOCK_SIGNAL_SECOND,
-            WriteType::WithResponse,
-        ).await.map_err(IQOSError::BleError)?;
-
-        peripheral.write(
-            &self.scp_control_characteristic,
-            &CONFIRMATION_SIGNAL,
-            WriteType::WithResponse,
-        ).await.map_err(IQOSError::BleError)?;
-
+        self.send_command_vec(vec!(UNLOCK_SIGNAL_FIRST.to_vec(), UNLOCK_SIGNAL_SECOND.to_vec())).await?;
+        self.send_confirm().await?;
         Ok(())
     }
 }

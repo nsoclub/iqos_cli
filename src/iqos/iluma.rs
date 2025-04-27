@@ -25,6 +25,18 @@ pub const AUTOSTART_DISABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x01, 0x0
 pub const SMARTGESTURE_ENABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x04, 0x01, 0x00, 0x00, 0x3c];
 pub const SMARTGESTURE_DISABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x04, 0x00, 0x00, 0x00, 0x57];
 
+pub static WHEN_CHARGING_START_ON_SIGNALS: [&[u8]; 4] = [
+    &[0x01, 0xC9, 0x4F, 0x04, 0x72, 0x04, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06],
+    &[0x01, 0xC9, 0x4F, 0x04, 0x72, 0x05, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x72],
+];
+pub static WHEN_CHARGING_START_OFF_SIGNALS: [&[u8]; 4] = [
+    &[0x01, 0xC9, 0x4F, 0x04, 0x64, 0x04, 0x00, 0xFF, 0xFF, 0xFF, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c],
+    &[0x01, 0xC9, 0x4F, 0x04, 0x4d, 0x05, 0x00, 0xFF, 0xFF, 0xFF, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78],
+];
 pub const WHEN_STARTING_TO_USE_SIGNAL: u16 = 0x1000;
 pub const WHEN_HEATING_START_SIGNAL: u16 = 0x0100;
 pub const WHEN_MANUALLY_TERMINATED_SIGNAL: u16 = 0x0010;
@@ -87,9 +99,43 @@ impl VibrationSettings {
         }
     }
 
-    pub fn build(&self) -> Vec<u8> {
+    fn checksum(&self, data: &u16) -> u8 {
+        let mut checksum: u8 = 0x77;
+
+        if (data & 0x0001) != 0 {
+            checksum ^= 0x07;
+        }
+        if (data & 0x0010) != 0 {
+            checksum ^= 0x70;
+        }
+        if (data & 0x0100) != 0 {
+            checksum ^= 0x15;
+        }
+        if (data & 0x1000) != 0 {
+            checksum ^= 0x57;
+        }
+
+        checksum
+    } 
+
+    pub fn build(&self) -> Vec<Vec<u8>> {
+        let mut ret = vec![];
         let mut signal = vec![0x00, 0xC9, 0x44, 0x23, 0x10, 0x00];
         let mut reg = 0u16;
+
+        if self.when_charging_start {
+            ret.extend(
+                WHEN_CHARGING_START_ON_SIGNALS
+                    .iter()
+                    .map(|&signal| signal.to_vec())
+            );
+        } else {
+            ret.extend(
+                WHEN_CHARGING_START_OFF_SIGNALS
+                    .iter()
+                    .map(|&signal| signal.to_vec())
+            );
+        }
 
         if self.when_heating_start {
             reg |= WHEN_HEATING_START_SIGNAL;
@@ -104,15 +150,16 @@ impl VibrationSettings {
             reg |= WHEN_MANUALLY_TERMINATED_SIGNAL;
         }
 
-        // Add the 2-byte flag to the signal
-        signal.push((reg >> 8) as u8); // High byte
-        signal.push((reg & 0xFF) as u8); // Low byte
+        println!("reg: {:#06x}", reg);
+        println!("reg: {:#02x}", reg);
+        println!("reg u8: {:#06x}", reg as u8);
+        println!("checksum: {:#02x}", self.checksum(&reg));
+        signal.push((reg >> 8) as u8);
+        signal.push((reg & 0xff) as u8);
+        signal.push(self.checksum(&reg));
 
-        // Calculate checksum
-        let checksum: u8 = signal.iter().fold(0u8, |acc, &x| acc.wrapping_add(x));
-        signal.push(checksum);
-
-        signal
+        ret.push(signal);
+        ret
     }
 
     pub fn parse_from_args(args: &[&str]) -> Self {
@@ -195,16 +242,18 @@ impl IqosIluma for IqosBle {
             return Err(IQOSError::IncompatibleModelError);
         }
 
-        let signal = settings.build();
+        let signals = settings.build();
         
         let peripheral = self.peripheral();
         let characteristic = self.scp_control_characteristic();
         
-        peripheral.write(
-            characteristic,
-            &signal,
-            WriteType::WithResponse,
-        ).await.map_err(IQOSError::BleError)?;
+        for signal in signals {
+            peripheral.write(
+                characteristic,
+                &signal,
+                WriteType::WithResponse,
+            ).await.map_err(IQOSError::BleError)?;
+        }
 
         Ok(())
     }
