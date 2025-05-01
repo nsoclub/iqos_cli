@@ -16,6 +16,7 @@ pub trait Iqos {
     async fn lock_device(&self) -> Result<()>;
     
     async fn unlock_device(&self) -> Result<()>;
+
 }
 
 pub trait IqosIluma {

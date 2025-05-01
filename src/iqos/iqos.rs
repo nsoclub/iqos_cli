@@ -1,10 +1,10 @@
 use super::error::{IQOSError, Result};
 use super::device::Iqos;
+use super::iluma::{self, IlumaSpecific};
 use super::COMMAND_CHECKSUM_XOR;
 use btleplug::api::{Characteristic, Peripheral as _, WriteType};
 use btleplug::platform::Peripheral;
 
-// チェックサム修正済みのコマンド定数
 pub const CONFIRMATION_SIGNAL: [u8; 5] = [0x00, 0xc0, 0x01, 0x00, 0xF6];
 // pub const START_VIBRATE_SIGNAL: [u8; 8] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x65];
 pub const START_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x00, 0xc3];
@@ -44,7 +44,7 @@ impl IQOSModel {
                 }
             }
         }
-        IQOSModel::Iluma // デフォルトはIlumaとする
+        IQOSModel::Iluma
     }
 }
 
@@ -60,6 +60,7 @@ pub struct IqosBle {
     scp_control_characteristic: Characteristic,
     model: IQOSModel,
     product_number: String,
+    iluma: Option<IlumaSpecific>,
 }
 
 impl IqosBle {
@@ -72,6 +73,7 @@ impl IqosBle {
         battery_characteristic: Characteristic,
         scp_control_characteristic: Characteristic,
         product_number: String,
+        iluma: Option<IlumaSpecific>,
     ) -> Self {
         let model = IQOSModel::from_peripheral(&peripheral).await;
         Self {
@@ -85,6 +87,7 @@ impl IqosBle {
             scp_control_characteristic,
             model,
             product_number,
+            iluma,
         }
     }
 
@@ -205,6 +208,19 @@ impl Iqos for IqosBle {
 
 impl std::fmt::Display for IqosBle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_iluma() {
+            return write!(
+                f,
+                "Model: {}\nModel Number: {}\nSerial Number: {}\n\nStick:\n\tManufacturer Name: {}\n\tProduct Number: {}\n\tSoftware Revision: {}\nHolder:\n\tHolder Product Number: {}",
+                self.model,
+                self.modelnumber,
+                self.serialnumber,
+                self.manufacturername,
+                self.product_number,
+                self.softwarerevision,
+                self.iluma.as_ref().unwrap().holder_product_number(),
+            )
+        }
         write!(
             f,
             "Model: {}\nModel Number: {}\nSerial Number: {}\nSoftware Revision: {}\nManufacturer Name: {}\nProduct Number: {}",

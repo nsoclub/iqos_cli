@@ -1,8 +1,9 @@
+use super::iluma::IlumaSpecific;
 use super::iqos::{IQOSModel, IqosBle};
 use super::error::{IQOSError, Result};
 use super::device::{Iqos, IqosIluma};
 use super::{
-    BATTERY_CHARACTERISTIC_UUID, CORE_SERVICE_UUID, DEVICE_INFO_SERVICE_UUID, MANUFACTURER_NAME_CHAR_UUID, MODEL_NUMBER_CHAR_UUID, SERIAL_NUMBER_CHAR_UUID, SOFTWARE_REVISION_CHAR_UUID, SCP_CONTROL_CHARACTERISTIC_UUID, PRODUCT_NUM_SIGNAL,
+    BATTERY_CHARACTERISTIC_UUID, CORE_SERVICE_UUID, DEVICE_INFO_SERVICE_UUID, MANUFACTURER_NAME_CHAR_UUID, MODEL_NUMBER_CHAR_UUID, SERIAL_NUMBER_CHAR_UUID, SOFTWARE_REVISION_CHAR_UUID, SCP_CONTROL_CHARACTERISTIC_UUID, PRODUCT_NUM_SIGNAL, HOLDER_PRODUCT_NUM_SIGNAL
 };
 use btleplug::platform::Peripheral;
 use btleplug::api::{Characteristic, Peripheral as _, Service};
@@ -19,6 +20,7 @@ pub struct IQOSBuilder {
     battery_characteristic: Option<Characteristic>,
     scp_control_characteristic: Option<Characteristic>,
     product_number: Option<String>,
+    iluma: Option<IlumaSpecific>,
 }
 
 impl IQOSBuilder {
@@ -32,6 +34,7 @@ impl IQOSBuilder {
             battery_characteristic: None,
             scp_control_characteristic: None,
             product_number: None,
+            iluma: None,
         }
     }
 
@@ -44,6 +47,7 @@ impl IQOSBuilder {
             .ok_or(IQOSError::ConfigurationError("SCP Control characteristic is required".to_string()))?).await?;
 
         self.load_product_num().await?;
+        self.load_holder_product_num().await?;
         
         Ok(())
     }
@@ -140,6 +144,32 @@ impl IQOSBuilder {
         Ok(())
     }
 
+    async fn load_holder_product_num(&mut self) -> Result<()> {
+        let peripheral = self.peripheral
+            .as_ref()
+            .ok_or(IQOSError::ConfigurationError("Peripheral is required".to_string()))?;
+
+        self.write(HOLDER_PRODUCT_NUM_SIGNAL.to_vec()).await?;
+
+        let mut stream = peripheral.notifications().await?;
+
+        if let Some(notification) = stream.next().await {
+            let prefix: [u8; 4] = [0x00, 0x08, 0x88, 0x03];
+            
+            if notification.value.len() >= 4 && notification.value[0..4] == prefix {
+                let product_num = &notification.value[4..];
+                
+                let ascii_string = product_num.iter()
+                    .map(|&b| if b.is_ascii() && !b.is_ascii_control() { b as char } else { '.' })
+                    .collect::<String>();
+                println!("Holder Product Number: {}", ascii_string);
+                self.iluma = Some(IlumaSpecific::new(ascii_string, "".to_string()));
+            }
+        }
+        
+        Ok(())
+    }
+
     async fn load_device_info(&mut self) -> Result<()> {
         let peripheral = self.peripheral
             .as_mut()
@@ -216,6 +246,7 @@ impl IQOSBuilder {
             self.battery_characteristic.ok_or(IQOSError::ConfigurationError("Battery characteristic is required".to_string()))?,
             self.scp_control_characteristic.ok_or(IQOSError::ConfigurationError("SCP Control characteristic is required".to_string()))?,
             self.product_number.unwrap_or_else(|| "Unknown".to_string()),
+            self.iluma,
         ).await;
 
         Ok(iqos)

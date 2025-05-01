@@ -4,6 +4,24 @@ use super::device::IqosIluma;
 use super::iqos::IqosBle;
 use btleplug::api::{Peripheral as _, WriteType};
 
+pub struct IlumaSpecific {
+    holder_product_number: String,
+    firmware_version: String,
+}
+
+impl IlumaSpecific {
+    pub fn new(holder_product_number: String, firmware_version: String) -> Self {
+        Self {
+            holder_product_number,
+            firmware_version,
+        }
+    }
+
+    pub fn holder_product_number(&self) -> &str {
+        &self.holder_product_number
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum BrightnessLevel {
     High,
@@ -225,7 +243,6 @@ impl VibrationSettings {
         }
     }
 }
-
 
 impl IqosIluma for IqosBle {
     async fn update_brightness(&self, level: BrightnessLevel) -> Result<()> {
