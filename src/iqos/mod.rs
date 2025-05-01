@@ -26,3 +26,5 @@ pub const MANUFACTURER_NAME_CHAR_UUID: &str = "00002a29";
 pub const BATTERY_CHARACTERISTIC_UUID: Uuid = uuid!("f8a54120-b041-11e4-9be7-0002a5d5c51b");
 pub const SCP_CONTROL_CHARACTERISTIC_UUID: Uuid = uuid!("e16c6e20-b041-11e4-a4c3-0002a5d5c51b");
 pub const COMMAND_CHECKSUM_XOR:u8 = 0x37;
+
+pub const PRODUCT_NUM_SIGNAL: [u8; 5] = [0x00, 0xC0, 0x00, 0x03, 0x09];

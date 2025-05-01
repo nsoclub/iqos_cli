@@ -25,17 +25,23 @@ pub const AUTOSTART_DISABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x01, 0x0
 pub const SMARTGESTURE_ENABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x04, 0x01, 0x00, 0x00, 0x3c];
 pub const SMARTGESTURE_DISABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x04, 0x00, 0x00, 0x00, 0x57];
 
-pub static WHEN_CHARGING_START_ON_SIGNALS: [&[u8]; 4] = [
+pub static WHEN_CHARGING_START_ON_SIGNALS: [&[u8]; 7] = [
     &[0x01, 0xC9, 0x4F, 0x04, 0x72, 0x04, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
     &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06],
     &[0x01, 0xC9, 0x4F, 0x04, 0x72, 0x05, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
     &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x72],
+    &[0x00, 0xC9, 0x47, 0x04, 0x00, 0xFF, 0xFF, 0x00, 0xDA],
+    &[0x00, 0xC9, 0x07, 0x04, 0x04, 0x00, 0x00, 0x00, 0x08],
+    &[0x00, 0xC9, 0x07, 0x04, 0x05, 0x00, 0x00, 0x00, 0x1E],
 ];
-pub static WHEN_CHARGING_START_OFF_SIGNALS: [&[u8]; 4] = [
+pub static WHEN_CHARGING_START_OFF_SIGNALS: [&[u8]; 7] = [
     &[0x01, 0xC9, 0x4F, 0x04, 0x64, 0x04, 0x00, 0xFF, 0xFF, 0xFF, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
     &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c],
     &[0x01, 0xC9, 0x4F, 0x04, 0x4d, 0x05, 0x00, 0xFF, 0xFF, 0xFF, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
     &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78],
+    &[0x00, 0xC9, 0x47, 0x04, 0x00, 0xFF, 0xFF, 0x00, 0xDA],
+    &[0x00, 0xC9, 0x07, 0x04, 0x04, 0x00, 0x00, 0x00, 0x08],
+    &[0x00, 0xC9, 0x07, 0x04, 0x05, 0x00, 0x00, 0x00, 0x1E],
 ];
 pub const WHEN_STARTING_TO_USE_SIGNAL: u16 = 0x1000;
 pub const WHEN_HEATING_START_SIGNAL: u16 = 0x0100;
@@ -120,9 +126,9 @@ impl VibrationSettings {
 
     pub fn build(&self) -> Vec<Vec<u8>> {
         let mut ret = vec![];
-        let mut signal = vec![0x00, 0xC9, 0x44, 0x23, 0x10, 0x00];
         let mut reg = 0u16;
 
+        // 充電開始時の設定 - これは特別なシグナルを使用
         if self.when_charging_start {
             ret.extend(
                 WHEN_CHARGING_START_ON_SIGNALS
@@ -137,6 +143,7 @@ impl VibrationSettings {
             );
         }
 
+        // 他の設定を反映
         if self.when_heating_start {
             reg |= WHEN_HEATING_START_SIGNAL;
         }
@@ -150,12 +157,28 @@ impl VibrationSettings {
             reg |= WHEN_MANUALLY_TERMINATED_SIGNAL;
         }
 
-        println!("reg: {:#06x}", reg);
-        println!("reg: {:#02x}", reg);
-        println!("reg u8: {:#06x}", reg as u8);
-        println!("checksum: {:#02x}", self.checksum(&reg));
-        signal.push((reg >> 8) as u8);
-        signal.push((reg & 0xff) as u8);
+        // すべての設定がオフかどうかをチェック（充電開始は除く）
+        let all_other_settings_off = !self.when_heating_start && 
+                                    !self.when_starting_to_use && 
+                                    !self.when_puff_end && 
+                                    !self.when_manually_terminated;
+
+        // すべての設定がオフで、かつ充電開始もオフの場合は特別なケース
+        if all_other_settings_off && !self.when_charging_start {
+            println!("hey guys");
+            let mut signal = vec![0x00, 0xC9, 0x44, 0x23, 0x10, 0x00];
+            signal.push(0x00);  // reg上位バイト
+            signal.push(0x00);  // reg下位バイト
+            signal.push(self.checksum(&0x0000));
+            ret.push(signal);
+            return ret;
+        }
+
+        // メインのシグナルを構築
+        // 充電開始がオンでも、他の設定のレジスタ値を適用する
+        let mut signal = vec![0x00, 0xC9, 0x44, 0x23, 0x10, 0x00];
+        signal.push((reg >> 8) as u8);  // 上位バイト
+        signal.push((reg & 0xff) as u8); // 下位バイト
         signal.push(self.checksum(&reg));
 
         ret.push(signal);
@@ -243,16 +266,17 @@ impl IqosIluma for IqosBle {
         }
 
         let signals = settings.build();
-        
-        let peripheral = self.peripheral();
-        let characteristic = self.scp_control_characteristic();
+        for (i, signal) in signals.iter().enumerate() {
+            let hex_string = signal.iter()
+                .map(|byte| format!("{:02X}", byte))
+                .collect::<Vec<String>>()
+                .join(" ");
+            println!("  Signal {}: {}", i, hex_string);
+        }
+        // return Ok(());
         
         for signal in signals {
-            peripheral.write(
-                characteristic,
-                &signal,
-                WriteType::WithResponse,
-            ).await.map_err(IQOSError::BleError)?;
+            self.send_command(signal).await?;
         }
 
         Ok(())
