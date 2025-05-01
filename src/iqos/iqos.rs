@@ -211,7 +211,7 @@ impl std::fmt::Display for IqosBle {
         if self.is_iluma() {
             return write!(
                 f,
-                "Model: {}\nModel Number: {}\nSerial Number: {}\n\nStick:\n\tManufacturer Name: {}\n\tProduct Number: {}\n\tSoftware Revision: {}\nHolder:\n\tHolder Product Number: {}",
+                "Model: {}\nModel Number: {}\nSerial Number: {}\nManufacturer Name: {}\n\nStick:\n\tProduct Number: {}\n\tSoftware Revision: {}\nHolder:\n\tHolder Product Number: {}",
                 self.model,
                 self.modelnumber,
                 self.serialnumber,
