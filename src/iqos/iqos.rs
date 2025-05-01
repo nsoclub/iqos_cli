@@ -17,6 +17,7 @@ pub const UNLOCK_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc9, 0x44, 0x04, 0x00, 0x00, 0x
 // pub const UNLOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0xC0];
 pub const UNLOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0x1c];
 
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum IQOSModel {
     One,
@@ -58,6 +59,7 @@ pub struct IqosBle {
     battery_characteristic: Characteristic,
     scp_control_characteristic: Characteristic,
     model: IQOSModel,
+    product_number: String,
 }
 
 impl IqosBle {
@@ -69,6 +71,7 @@ impl IqosBle {
         manufacturername: String,
         battery_characteristic: Characteristic,
         scp_control_characteristic: Characteristic,
+        product_number: String,
     ) -> Self {
         let model = IQOSModel::from_peripheral(&peripheral).await;
         Self {
@@ -81,10 +84,11 @@ impl IqosBle {
             battery_characteristic,
             scp_control_characteristic,
             model,
+            product_number,
         }
     }
 
-    async fn send_command(&self, command: Vec<u8>) -> Result<()> {
+    pub async fn send_command(&self, command: Vec<u8>) -> Result<()> {
         let peripheral = &self.peripheral;
         
         peripheral.write(
@@ -203,12 +207,13 @@ impl std::fmt::Display for IqosBle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Model: {}\nModel Number: {}\nSerial Number: {}\nSoftware Revision: {}\nManufacturer Name: {}\n",
+            "Model: {}\nModel Number: {}\nSerial Number: {}\nSoftware Revision: {}\nManufacturer Name: {}\nProduct Number: {}",
             self.model,
             self.modelnumber,
             self.serialnumber,
             self.softwarerevision,
             self.manufacturername,
+            self.product_number,
         )
     }
 }

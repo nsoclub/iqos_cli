@@ -2,12 +2,13 @@ use super::iqos::{IQOSModel, IqosBle};
 use super::error::{IQOSError, Result};
 use super::device::{Iqos, IqosIluma};
 use super::{
-    BATTERY_CHARACTERISTIC_UUID, CORE_SERVICE_UUID, DEVICE_INFO_SERVICE_UUID, MANUFACTURER_NAME_CHAR_UUID, MODEL_NUMBER_CHAR_UUID, SERIAL_NUMBER_CHAR_UUID, SOFTWARE_REVISION_CHAR_UUID, SCP_CONTROL_CHARACTERISTIC_UUID
+    BATTERY_CHARACTERISTIC_UUID, CORE_SERVICE_UUID, DEVICE_INFO_SERVICE_UUID, MANUFACTURER_NAME_CHAR_UUID, MODEL_NUMBER_CHAR_UUID, SERIAL_NUMBER_CHAR_UUID, SOFTWARE_REVISION_CHAR_UUID, SCP_CONTROL_CHARACTERISTIC_UUID, PRODUCT_NUM_SIGNAL,
 };
 use btleplug::platform::Peripheral;
 use btleplug::api::{Characteristic, Peripheral as _, Service};
 use std::collections::BTreeSet;
 use uuid::Uuid;
+use futures::StreamExt; // Added this for stream.next().await
 
 pub struct IQOSBuilder {
     peripheral: Option<Peripheral>,
@@ -17,6 +18,7 @@ pub struct IQOSBuilder {
     manufacturername: Option<String>,
     battery_characteristic: Option<Characteristic>,
     scp_control_characteristic: Option<Characteristic>,
+    product_number: Option<String>,
 }
 
 impl IQOSBuilder {
@@ -29,6 +31,7 @@ impl IQOSBuilder {
             manufacturername: None,
             battery_characteristic: None,
             scp_control_characteristic: None,
+            product_number: None,
         }
     }
 
@@ -36,6 +39,36 @@ impl IQOSBuilder {
         
         self.load_device_info().await?;
         self.load_characteristics().await?;
+
+        self.subscribe(self.scp_control_characteristic.as_ref()
+            .ok_or(IQOSError::ConfigurationError("SCP Control characteristic is required".to_string()))?).await?;
+
+        self.load_product_num().await?;
+        
+        Ok(())
+    }
+
+    async fn write(&self, byte: Vec<u8>) -> Result<()> {
+        let peripheral = self.peripheral
+            .as_ref()
+            .ok_or(IQOSError::ConfigurationError("Peripheral is required".to_string()))?;
+        
+        peripheral.write(
+            self.scp_control_characteristic.as_ref().ok_or(IQOSError::ConfigurationError("SCP Control characteristic is required".to_string()))?,
+            &byte,
+            btleplug::api::WriteType::WithResponse,
+        ).await.map_err(IQOSError::BleError)?;
+        
+        Ok(())
+    }
+
+    async fn subscribe(&self, characteristic: &Characteristic) -> Result<()> {
+        let peripheral = self.peripheral
+            .as_ref()
+            .ok_or(IQOSError::ConfigurationError("Peripheral is required".to_string()))?;
+        
+        peripheral.subscribe(characteristic).await
+            .map_err(IQOSError::BleError)?;
         
         Ok(())
     }
@@ -81,12 +114,37 @@ impl IQOSBuilder {
             .cloned())
     }
 
+    async fn load_product_num(&mut self) -> Result<()> {
+        let peripheral = self.peripheral
+            .as_ref()
+            .ok_or(IQOSError::ConfigurationError("Peripheral is required".to_string()))?;
+
+        self.write(PRODUCT_NUM_SIGNAL.to_vec()).await?;
+
+        let mut stream = peripheral.notifications().await?;
+        
+        if let Some(notification) = stream.next().await {
+            
+            let prefix: [u8; 4] = [0x00, 0xc0, 0x88, 0x03];
+            
+            if notification.value.len() >= 4 && notification.value[0..4] == prefix {
+                let product_num = &notification.value[4..notification.value.len() - 1];
+                
+                let ascii_string = product_num.iter()
+                    .map(|&b| if b.is_ascii() && !b.is_ascii_control() { b as char } else { '.' })
+                    .collect::<String>();
+                self.product_number = Some(ascii_string);
+            }
+        }
+        
+        Ok(())
+    }
+
     async fn load_device_info(&mut self) -> Result<()> {
         let peripheral = self.peripheral
             .as_mut()
             .ok_or(IQOSError::ConfigurationError("Peripheral is required".to_string()))?;
         
-        // デバイス情報サービスからキャラクタリスティックを読み取る
         if let Some(service) = peripheral.services().iter().find(|s| s.uuid == DEVICE_INFO_SERVICE_UUID) {
             for characteristic in &service.characteristics {
                 match characteristic.uuid.to_string().split('-').next().unwrap() {
@@ -157,6 +215,7 @@ impl IQOSBuilder {
             self.manufacturername.unwrap_or_else(|| "Unknown".to_string()),
             self.battery_characteristic.ok_or(IQOSError::ConfigurationError("Battery characteristic is required".to_string()))?,
             self.scp_control_characteristic.ok_or(IQOSError::ConfigurationError("SCP Control characteristic is required".to_string()))?,
+            self.product_number.unwrap_or_else(|| "Unknown".to_string()),
         ).await;
 
         Ok(iqos)
