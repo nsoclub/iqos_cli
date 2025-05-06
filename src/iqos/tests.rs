@@ -101,3 +101,7 @@ mod tests {
         Ok(())
     }
 }
+
+// チェックサムテスト用のモジュールは別ファイルで定義済み
+#[cfg(test)]
+mod iqos_checksum_tests;

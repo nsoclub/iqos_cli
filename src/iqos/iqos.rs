@@ -4,6 +4,8 @@ use super::iluma::{self, IlumaSpecific};
 use super::COMMAND_CHECKSUM_XOR;
 use btleplug::api::{Characteristic, Peripheral as _, WriteType};
 use btleplug::platform::Peripheral;
+use futures::{Stream, StreamExt};
+use std::pin::Pin;
 
 pub const CONFIRMATION_SIGNAL: [u8; 5] = [0x00, 0xc0, 0x01, 0x00, 0xF6];
 // pub const START_VIBRATE_SIGNAL: [u8; 8] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x65];
@@ -89,6 +91,25 @@ impl IqosBle {
             product_number,
             iluma,
         }
+    }
+
+    // pub async fn notifications(&self) -> btleplug::Result<impl futures::Stream<Item = btleplug::api::ValueNotification> + Send + '_> {
+    //     self.peripheral.notifications().await
+    // }
+
+    pub async fn notifications(&self) -> btleplug::Result<Pin<Box<dyn Stream<Item = btleplug::api::ValueNotification> + Send + '_>>> {
+        Ok(Box::pin(self.peripheral.notifications().await?))
+    }
+    
+    pub async fn print_notifications(&self) -> Result<()> {
+        let mut notifications = self.notifications().await.map_err(IQOSError::BleError)?;
+        // tokio::pin!(notifications);
+        
+        while let Some(data) = notifications.next().await {
+            println!("Notification: {:?}", data);
+        }
+        
+        Ok(())
     }
 
     pub async fn send_command(&self, command: Vec<u8>) -> Result<()> {

@@ -9,7 +9,7 @@ use btleplug::platform::Peripheral;
 use btleplug::api::{Characteristic, Peripheral as _, Service};
 use std::collections::BTreeSet;
 use uuid::Uuid;
-use futures::StreamExt; // Added this for stream.next().await
+use futures::StreamExt;
 
 pub struct IQOSBuilder {
     peripheral: Option<Peripheral>,

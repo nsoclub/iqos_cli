@@ -22,6 +22,8 @@ pub trait Iqos {
 pub trait IqosIluma {
     async fn update_brightness(&self, level: BrightnessLevel) -> Result<()>;
     
+    async fn load_vibration_settings(&self) -> Result<VibrationSettings>;
+
     async fn update_vibration_settings(&self, settings: VibrationSettings) -> Result<()>;
     
     async fn update_smartgesture(&self, enable: bool) -> Result<()>;

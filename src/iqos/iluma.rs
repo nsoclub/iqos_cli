@@ -3,6 +3,7 @@ use crate::iqos::error::{IQOSError, Result};
 use super::device::IqosIluma;
 use super::iqos::IqosBle;
 use btleplug::api::{Peripheral as _, WriteType};
+use futures::StreamExt; // Added this for stream.next().await
 
 pub struct IlumaSpecific {
     holder_product_number: String,
@@ -65,6 +66,8 @@ pub const WHEN_STARTING_TO_USE_SIGNAL: u16 = 0x1000;
 pub const WHEN_HEATING_START_SIGNAL: u16 = 0x0100;
 pub const WHEN_MANUALLY_TERMINATED_SIGNAL: u16 = 0x0010;
 pub const WHEN_PUFF_END_SIGNAL: u16 = 0x0001;
+
+pub const LOAD_VIBRATION_SETTINGS_SIGNAL: [u8; 5] = [0x00, 0xc9, 0x00, 0x23, 0xE9];
 
 #[derive(Debug)]
 pub struct NotIlumaError;
@@ -175,28 +178,24 @@ impl VibrationSettings {
             reg |= WHEN_MANUALLY_TERMINATED_SIGNAL;
         }
 
-        // すべての設定がオフかどうかをチェック（充電開始は除く）
         let all_other_settings_off = !self.when_heating_start && 
                                     !self.when_starting_to_use && 
                                     !self.when_puff_end && 
                                     !self.when_manually_terminated;
 
-        // すべての設定がオフで、かつ充電開始もオフの場合は特別なケース
         if all_other_settings_off && !self.when_charging_start {
             println!("hey guys");
             let mut signal = vec![0x00, 0xC9, 0x44, 0x23, 0x10, 0x00];
-            signal.push(0x00);  // reg上位バイト
-            signal.push(0x00);  // reg下位バイト
+            signal.push(0x00);
+            signal.push(0x00);
             signal.push(self.checksum(&0x0000));
             ret.push(signal);
             return ret;
         }
 
-        // メインのシグナルを構築
-        // 充電開始がオンでも、他の設定のレジスタ値を適用する
         let mut signal = vec![0x00, 0xC9, 0x44, 0x23, 0x10, 0x00];
-        signal.push((reg >> 8) as u8);  // 上位バイト
-        signal.push((reg & 0xff) as u8); // 下位バイト
+        signal.push((reg >> 8) as u8);
+        signal.push((reg & 0xff) as u8);
         signal.push(self.checksum(&reg));
 
         ret.push(signal);
@@ -210,7 +209,6 @@ impl VibrationSettings {
         let mut when_puff_end = false;
         let mut when_manually_terminated = false;
         
-        // Parse args in pairs (option + value)
         let mut i = 0;
         while i < args.len() - 1 {
             match args[i] {
@@ -229,7 +227,7 @@ impl VibrationSettings {
                 "puffend" => {
                     when_puff_end = args[i+1] == "on";
                 },
-                _ => {} // Ignore unknown options
+                _ => {}
             }
             i += 2;
         }
@@ -241,6 +239,39 @@ impl VibrationSettings {
             when_puff_end,
             when_manually_terminated,
         }
+    }
+
+    pub fn parse_from_bytes(data: &[u8]) -> Result<Self> {
+        if data.len() < 9 {
+            return Err(IQOSError::ConfigurationError("Data too short for vibration settings".to_string()));
+        }
+        
+        if data[0] != 0x00 || data[1] != 0x08 || data[2] != 0x84 || data[3] != 0x23 || data[4] != 0x10 {
+            return Err(IQOSError::ConfigurationError("Invalid header for vibration settings".to_string()));
+        }
+        
+        // Parse vibration settings from bytes 8 and 9
+        // Byte 8 (index 7) contains "heat" (bit 0) and "use" (bit 4) settings
+        // Byte 9 (index 8) contains "end" (bit 0) and "terminated" (bit 4) settings
+        let heat_use_byte = data[6];
+        let end_terminated_byte = data[7];
+        
+        let when_heating_start = (heat_use_byte & 0x01) != 0;
+        let when_starting_to_use = (heat_use_byte & 0x10) != 0;
+        let when_puff_end = (end_terminated_byte & 0x01) != 0;
+        let when_manually_terminated = (end_terminated_byte & 0x10) != 0;
+        
+        // The "charge" setting isn't included in this notification packet
+        // For a complete implementation, we might need to handle it separately
+        let when_charging_start = false;
+        
+        Ok(Self {
+            when_charging_start,
+            when_heating_start,
+            when_starting_to_use,
+            when_puff_end,
+            when_manually_terminated,
+        })
     }
 }
 
@@ -275,6 +306,27 @@ impl IqosIluma for IqosBle {
         }
 
         Ok(())
+    }
+
+    async fn load_vibration_settings(&self) -> Result<VibrationSettings> {
+        self.send_command(LOAD_VIBRATION_SETTINGS_SIGNAL.to_vec()).await?;
+        let mut stream = self.notifications().await?;
+
+        if let Some(notification) = stream.next().await {
+            // 受信した通知データをHEX形式で表示
+            let hex_string = notification.value.iter()
+                .map(|byte| format!("{:02X}", byte))
+                .collect::<Vec<String>>()
+                .join(" ");
+            
+            if let Ok(settings) = VibrationSettings::parse_from_bytes(&notification.value) {
+                return Ok(settings);
+            } else {
+                return Err(IQOSError::ConfigurationError("Failed to parse vibration settings".to_string()));
+            }
+        } else {
+            return Err(IQOSError::ConfigurationError("No notifications received".to_string()));
+        }
     }
 
     async fn update_vibration_settings(&self, settings: VibrationSettings) -> Result<()> {
@@ -366,5 +418,17 @@ impl IqosIluma for IqosBle {
         ).await.map_err(IQOSError::BleError)?;
 
         Ok(())
+    }
+}
+
+impl std::fmt::Display for VibrationSettings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\nVibration Settings\n\twhen charge start: {}\n\twhen heating: {}\n\twhen starting: {}\n\twhen puff end soon: {}\n\twhen terminated: {}\n",
+            self.when_charging_start,
+            self.when_heating_start,
+            self.when_starting_to_use,
+            self.when_puff_end,
+            self.when_manually_terminated,
+        )
     }
 }

@@ -28,3 +28,4 @@ pub const SCP_CONTROL_CHARACTERISTIC_UUID: Uuid = uuid!("e16c6e20-b041-11e4-a4c3
 pub const COMMAND_CHECKSUM_XOR:u8 = 0x37;
 
 pub const PRODUCT_NUM_SIGNAL: [u8; 5] = [0x00, 0xC0, 0x00, 0x03, 0x09];
+pub const HOLDER_PRODUCT_NUM_SIGNAL: [u8; 5] = [0x00, 0xC9, 0x00, 0x03, 0x09];
