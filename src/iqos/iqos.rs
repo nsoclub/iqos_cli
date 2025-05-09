@@ -1,23 +1,29 @@
+use std::pin::Pin;
+use futures::{Stream, StreamExt};
 use super::error::{IQOSError, Result};
 use super::device::Iqos;
-use super::iluma::{self, IlumaSpecific};
-use super::COMMAND_CHECKSUM_XOR;
+use super::iluma::IlumaSpecific;
+use super::{IqosIluma, COMMAND_CHECKSUM_XOR};
+use super::brightness::{BrightnessLevel, LOAD_BRIGHTNESS_SIGNAL, BRIGHTNESS_HIGH_SIGNAL, BRIGHTNESS_LOW_SIGNAL};
+use super::vibration::{VibrationBehavior, VibrationSettings, LOAD_VIBRATION_SETTINGS_SIGNAL};
 use btleplug::api::{Characteristic, Peripheral as _, WriteType};
 use btleplug::platform::Peripheral;
-use futures::{Stream, StreamExt};
-use std::pin::Pin;
 
 pub const CONFIRMATION_SIGNAL: [u8; 5] = [0x00, 0xc0, 0x01, 0x00, 0xF6];
 // pub const START_VIBRATE_SIGNAL: [u8; 8] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x65];
 pub const START_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x01, 0x1e, 0x00, 0x00, 0xc3];
 // pub const STOP_VIBRATE_SIGNAL: [u8; 8] = [0x00, 0xc0, 0x45, 0x22, 0x00, 0x1e, 0x00, 0x64];
 pub const STOP_VIBRATE_SIGNAL: [u8; 9] = [0x00, 0xc0, 0x45, 0x22, 0x00, 0x1e, 0x00, 0x00, 0xd5];
-pub const LOCK_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc9, 0x44, 0x04, 0x02, 0xff, 0x00, 0x00, 0x5a];
+pub const LOCK_SIGNALS: [&[u8]; 2] = [
+    &[0x00, 0xc9, 0x44, 0x04, 0x02, 0xff, 0x00, 0x00, 0x5a],
+    &[0x00, 0xc9, 0x00, 0x04, 0x1c],
+];
 // pub const LOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0xC0];
-pub const LOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0x1c];
-pub const UNLOCK_SIGNAL_FIRST: [u8; 9] = [0x00, 0xc9, 0x44, 0x04, 0x00, 0x00, 0x00, 0x00, 0x5d];
+pub const UNLOCK_SIGNALS: [&[u8]; 2] = [
+    &[0x00, 0xc9, 0x44, 0x04, 0x00, 0x00, 0x00, 0x00, 0x5d],
+    &[0x00, 0xc9, 0x00, 0x04, 0x1c],
+];
 // pub const UNLOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0xC0];
-pub const UNLOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0x1c];
 
 
 #[derive(Debug, Clone, PartialEq)]
@@ -124,10 +130,11 @@ impl IqosBle {
         Ok(())
     }
     
-    pub async fn send_command_vec(&self, commands: Vec<Vec<u8>>) -> Result<()> {
-        for command in commands {
-            self.send_command(command).await?;
+    pub async fn send_command_slice<const N: usize>(&self, commands: [&[u8]; N]) -> Result<()> {
+        for com in commands {
+            self.send_command(com.to_vec()).await?;
         }
+
         Ok(())
     }
 
@@ -215,14 +222,78 @@ impl Iqos for IqosBle {
     }
     
     async fn lock_device(&self) -> Result<()> {
-        self.send_command_vec(vec!(LOCK_SIGNAL_FIRST.to_vec(), LOCK_SIGNAL_SECOND.to_vec())).await?;
+        self.send_command_slice(LOCK_SIGNALS).await?;
         self.send_confirm().await?;
         Ok(())
     }
     
     async fn unlock_device(&self) -> Result<()> {
-        self.send_command_vec(vec!(UNLOCK_SIGNAL_FIRST.to_vec(), UNLOCK_SIGNAL_SECOND.to_vec())).await?;
+        self.send_command_slice(UNLOCK_SIGNALS).await?;
         self.send_confirm().await?;
+        Ok(())
+    }
+    async fn load_brightness(&self) -> Result<BrightnessLevel> {
+        self.send_command(LOAD_BRIGHTNESS_SIGNAL.to_vec()).await?;
+        let mut stream = self.notifications().await?;
+
+        if let Some(notification) = stream.next().await {
+            let hex_string = notification.value.iter()
+                .map(|byte| format!("{:02X}", byte))
+                .collect::<Vec<String>>()
+                .join(" ");
+            
+            if let Ok(settings) = BrightnessLevel::from_bytes(&notification.value) {
+                return Ok(settings);
+            } else {
+                return Err(IQOSError::ConfigurationError("Failed to parse brightness settings".to_string()));
+            }
+        } else {
+            return Err(IQOSError::ConfigurationError("No notifications received".to_string()));
+        }
+    }
+
+    async fn update_brightness(&self, level: BrightnessLevel) -> Result<()> {
+        match level {
+            BrightnessLevel::High => self.send_command_slice(BRIGHTNESS_HIGH_SIGNAL).await,
+            BrightnessLevel::Low => self.send_command_slice(BRIGHTNESS_LOW_SIGNAL).await,
+        }
+    }
+
+    async fn load_vibration_settings(&self) -> Result<VibrationSettings> {
+        self.send_command(LOAD_VIBRATION_SETTINGS_SIGNAL.to_vec()).await?;
+        let mut stream = self.notifications().await?;
+
+        if let Some(notification) = stream.next().await {
+            let hex_string = notification.value.iter()
+                .map(|byte| format!("{:02X}", byte))
+                .collect::<Vec<String>>()
+                .join(" ");
+            
+            // if let Some(iluma) = .as_iluma()
+            if let Ok(settings) = VibrationSettings::from_bytes(&notification.value) {
+                return Ok(settings);
+            } else {
+                return Err(IQOSError::ConfigurationError("Failed to parse vibration settings".to_string()));
+            }
+        } else {
+            return Err(IQOSError::ConfigurationError("No notifications received".to_string()));
+        }
+    }
+
+    async fn update_vibration_settings(&self, settings: VibrationSettings) -> Result<()> {
+        let signals = settings.build();
+        for (i, signal) in signals.iter().enumerate() {
+            let hex_string = signal.iter()
+                .map(|byte| format!("{:02X}", byte))
+                .collect::<Vec<String>>()
+                .join(" ");
+            println!("  Signal {}: {}", i, hex_string);
+        }
+        
+        for signal in signals {
+            self.send_command(signal).await?;
+        }
+
         Ok(())
     }
 }

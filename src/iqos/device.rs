@@ -1,5 +1,6 @@
 use super::error::Result;
-use super::iluma::{BrightnessLevel, VibrationSettings};
+use super::brightness::BrightnessLevel;
+use super::vibration::VibrationSettings;
 
 /// すべてのIQOSデバイスに共通する基本機能
 pub trait Iqos {
@@ -17,14 +18,19 @@ pub trait Iqos {
     
     async fn unlock_device(&self) -> Result<()>;
 
-}
+    async fn load_brightness(&self) -> Result<BrightnessLevel>;
 
-pub trait IqosIluma {
     async fn update_brightness(&self, level: BrightnessLevel) -> Result<()>;
-    
+
     async fn load_vibration_settings(&self) -> Result<VibrationSettings>;
 
     async fn update_vibration_settings(&self, settings: VibrationSettings) -> Result<()>;
+}
+
+pub trait IqosIluma: Send + Sync {
+    async fn load_iluma_vibration_settings(&self) -> Result<VibrationSettings>;
+
+    async fn update_iluma_vibration_settings(&self, settings: VibrationSettings) -> Result<()>;
     
     async fn update_smartgesture(&self, enable: bool) -> Result<()>;
     

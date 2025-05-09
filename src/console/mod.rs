@@ -11,7 +11,8 @@ use std::future::Future;
 mod iqoshelper;
 use iqoshelper::IqosHelper;
 
-use crate::iqos::{IqosBle, BrightnessLevel, IqosIluma, Iqos, VibrationSettings};
+use crate::iqos::vibration::IlumaVibrationBehavior;
+use crate::iqos::{IqosBle, BrightnessLevel, IqosIluma, Iqos, VibrationSettings, vibration::VibrationBehavior};
 
 // クロージャーの型定義を修正
 type CommandFn = Box<dyn Fn(&IQOSConsole, Vec<String>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
@@ -67,7 +68,11 @@ impl IQOSConsole {
                         }
                     },
                     Some(Err(e)) => println!("{}", e),
-                    None => println!("使い方: brightness [high|low]"),
+                    None => iqos.load_brightness().await.map(|level| {
+                        println!("{}", level);
+                    }).unwrap_or_else(|_| {
+                        println!("このデバイスはILUMAモデルではありません");
+                    }),
                 }
                 Ok(())
             })
@@ -118,16 +123,23 @@ impl IQOSConsole {
 
         commands.insert("flexpuff".to_string(), Box::new(|console: &IQOSConsole, args| {
             let iqos = console.iqos.clone();
+            let args_cloned = args.clone();
             Box::pin(async move {
                 let iqos = iqos.lock().await;
-                match args.get(1).map(|s| s.as_str()) {
+                match args_cloned.get(1).map(|s| s.as_str()) {
                     Some("enable") => {
-                        iqos.update_flexpuff(true).await?;
-                        println!("Flexpuff enabled");
+                        let result = iqos.update_flexpuff(true).await;
+                        match result {
+                            Ok(_) => println!("Flexpuff enabled"),
+                            Err(e) => println!("エラー: {}", e),
+                        }
                     },
                     Some("disable") => {
-                        iqos.update_flexpuff(false).await?;
-                        println!("Flexpuff disabled");
+                        let result = iqos.update_flexpuff(false).await;
+                        match result {
+                            Ok(_) => println!("Flexpuff disabled"),
+                            Err(e) => println!("エラー: {}", e),
+                        }
                     },
                     Some(opt) => println!("無効なオプション: {}。'enable'または'disable'を指定してください", opt),
                     None => println!("使い方: flexpuff [enable|disable]"),
@@ -138,17 +150,26 @@ impl IQOSConsole {
         
         commands.insert("smartgesture".to_string(), Box::new(|console: &IQOSConsole, args| {
             let iqos = console.iqos.clone();
+            let args_cloned = args.clone();
             Box::pin(async move {
                 let iqos = iqos.lock().await;
                 if let Some(iluma) = iqos.as_iluma() {
-                    match args.get(1).map(|s| s.as_str()) {
+                    match args_cloned.get(1).map(|s| s.as_str()) {
                         Some("enable") => {
-                            iluma.update_smartgesture(true).await?;
-                            println!("スマートジェスチャーを有効にしました");
+                            // Turn the future into a proper Send future
+                            let result = iluma.update_smartgesture(true).await;
+                            match result {
+                                Ok(_) => println!("スマートジェスチャーを有効にしました"),
+                                Err(e) => println!("エラー: {}", e),
+                            }
                         },
                         Some("disable") => {
-                            iluma.update_smartgesture(false).await?;
-                            println!("スマートジェスチャーを無効にしました");
+                            // Turn the future into a proper Send future
+                            let result = iluma.update_smartgesture(false).await;
+                            match result {
+                                Ok(_) => println!("スマートジェスチャーを無効にしました"),
+                                Err(e) => println!("エラー: {}", e),
+                            }
                         },
                         Some(opt) => println!("無効なオプション: {}。'enable'または'disable'を指定してください", opt),
                         None => println!("使い方: smartgesture [enable|disable]"),
@@ -162,17 +183,24 @@ impl IQOSConsole {
 
         commands.insert("autostart".to_string(), Box::new(|console: &IQOSConsole, args| {
             let iqos = console.iqos.clone();
+            let args_cloned = args.clone();
             Box::pin(async move {
                 let iqos = iqos.lock().await;
-                if let Some(arg) = args.get(1) {
+                if let Some(arg) = args_cloned.get(1) {
                     match arg.to_lowercase() {
                         s if s == "on" || s == "enable" => {
-                            iqos.update_autostart(true).await?;
-                            println!("Autostart enabled");
+                            let result = iqos.update_autostart(true).await;
+                            match result {
+                                Ok(_) => println!("Autostart enabled"),
+                                Err(e) => println!("エラー: {}", e),
+                            }
                         },
                         s if s == "off" || s == "disable" => {
-                            iqos.update_autostart(false).await?;
-                            println!("Autostart disabled");
+                            let result = iqos.update_autostart(false).await;
+                            match result {
+                                Ok(_) => println!("Autostart disabled"),
+                                Err(e) => println!("エラー: {}", e),
+                            }
                         },
                         _ => println!("使い方: autostart [on|off]"),
                     }
@@ -188,22 +216,37 @@ impl IQOSConsole {
             let args_cloned = args.clone();
             Box::pin(async move {
                 let iqos = iqos.lock().await;
-                if let Some(iluma) = iqos.as_iluma() {
-                    // Convert Vec<String> to Vec<&str> for parse_from_args
-                    let str_args: Vec<&str> = args_cloned.iter().skip(1).map(|s| s.as_str()).collect();
+                let str_args: Vec<&str> = args_cloned.iter().map(|s| s.as_str()).collect();
+                
+                if str_args.len() >= 2 {
+                    let param_args = &str_args[1..];
                     
-                    // Check if we have at least one pair of arguments (option + value)
-                    if str_args.len() >= 2 {
-                        let settings = VibrationSettings::parse_from_args(&str_args);
+                    if let Some(iluma) = iqos.as_iluma() {
+                        let settings = VibrationSettings::from_args_with_charge_start(param_args)?;
                         iluma.update_vibration_settings(settings).await?;
                         println!("バイブレーション設定を更新しました");
                     } else {
-                        println!("使い方: vibration [charge|heating|starting|terminated|puffend] [on|off] ...");
-                        println!("例: vibration charge on heating on puffend on");
+                        let settings = VibrationSettings::from_args(param_args)?;
+                        iqos.update_vibration_settings(settings).await?;
+                        println!("バイブレーション設定を更新しました");
+                    }
+                } else if args_cloned.len() == 1 {
+                    if let Some(iluma) = iqos.as_iluma() {
+                        match iluma.load_iluma_vibration_settings().await {
+                            Ok(settings) => println!("{}", settings),
+                            Err(e) => println!("エラー: {}", e),
+                        }
+                    } else {
+                        match iqos.load_vibration_settings().await {
+                            Ok(settings) => println!("{}", settings),
+                            Err(e) => println!("エラー: {}", e),
+                        }
                     }
                 } else {
-                    println!("このデバイスはILUMAモデルではありません。vibrationコマンドはILUMAモデル専用です。");
-                } 
+                    println!("使い方: vibration [charge|heating|starting|terminated|puffend] [on|off] ...");
+                    println!("例: vibration charge on heating on puffend on");
+                    println!("注: chargeオプションはILUMAモデルのみ対応");
+                }
                 Ok(())
             })
         }));

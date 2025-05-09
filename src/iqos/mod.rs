@@ -1,8 +1,10 @@
 mod builder;
 mod iqos;
-pub mod iluma;  // モジュールを公開
+pub mod iluma;
 mod error;
-mod device;  // 新しいモジュールを追加
+mod device;
+pub mod brightness;
+pub mod vibration;
 
 use uuid::{uuid, Uuid};
 
@@ -11,8 +13,9 @@ mod tests;
 
 pub use builder::IQOSBuilder;
 pub use iqos::IqosBle;
-pub use iluma::{BrightnessLevel, VibrationSettings};  // BrightnessLevel も公開
-pub use device::{Iqos, IqosIluma};  // トレイトを公開
+pub use device::{Iqos, IqosIluma};
+pub use brightness::BrightnessLevel;
+pub use vibration::VibrationSettings;
 
 // Service UUIDs
 pub const DEVICE_INFO_SERVICE_UUID: Uuid = uuid!("0000180a-0000-1000-8000-00805f9b34fb");
