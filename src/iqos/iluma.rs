@@ -1,11 +1,11 @@
-use futures::StreamExt;
+use futures::{stream, StreamExt};
 
 use crate::iqos::error::{IQOSError, Result};
-use crate::iqos::vibration::{VibrationSettings, LOAD_VIBRATION_SETTINGS_SIGNAL};
+use crate::iqos::vibration::{self, VibrationSettings, LOAD_VIBRATION_SETTINGS_SIGNAL};
 
 use super::device::IqosIluma;
 use super::iqos::IqosBle;
-use super::vibration::IlumaVibrationBehavior;
+use super::vibration::{IlumaVibration, IlumaVibrationBehavior};
 use btleplug::api::{Peripheral as _, WriteType};
 
 pub struct IlumaSpecific {
@@ -34,6 +34,8 @@ pub const AUTOSTART_DISABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x01, 0x0
 pub const SMARTGESTURE_ENABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x04, 0x01, 0x00, 0x00, 0x3c];
 pub const SMARTGESTURE_DISABLE_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x47, 0x24, 0x04, 0x00, 0x00, 0x00, 0x57];
 
+const LOAD_VIBRATE_CHARGE_START_SIGNAL: [u8; 9] = [0x00, 0xc9, 0x07, 0x04, 0x04, 0x00, 0x00, 0x00, 0x08];
+
 #[derive(Debug)]
 pub struct NotIlumaError;
 
@@ -47,8 +49,29 @@ impl std::error::Error for NotIlumaError {}
 
 impl IqosIluma for IqosBle {
     async fn load_iluma_vibration_settings(&self) -> Result<VibrationSettings> {
+        let mut when_charge_start: IlumaVibration = IlumaVibration::new(false);
+        let mut vibration_settings: VibrationSettings = VibrationSettings::new(
+            false,
+            false,
+            false,
+            false,
+        );
         if !self.is_iluma() {
             return Err(IQOSError::IncompatibleModelError);
+        }
+        self.send_command(LOAD_VIBRATE_CHARGE_START_SIGNAL.to_vec()).await?;
+        let mut stream = self.notifications().await?;
+        if let Some(notification) = stream.next().await {
+            if let Ok(when_charge_start) = VibrationSettings::from_bytes_with_charge_start(notification.value.as_slice()) {
+                vibration_settings.iluma_and_higher = Some(when_charge_start);
+            } else {
+                return Err(IQOSError::ConfigurationError("Failed to parse vibration settings".to_string()));
+            }
+            let hex_string = notification.value.iter()
+                .map(|byte| format!("{:02X}", byte))
+                .collect::<Vec<String>>()
+                .join(" ");
+            println!("  Signal: {}", hex_string);
         }
 
         self.send_command(LOAD_VIBRATION_SETTINGS_SIGNAL.to_vec()).await?;
@@ -56,7 +79,11 @@ impl IqosIluma for IqosBle {
 
         if let Some(notification) = stream.next().await {
             if let Ok(settings) = VibrationSettings::from_bytes(&notification.value) {
-                return Ok(settings);
+                vibration_settings.when_heating_start = settings.when_heating_start;
+                vibration_settings.when_starting_to_use = settings.when_starting_to_use;
+                vibration_settings.when_puff_end = settings.when_puff_end;
+                vibration_settings.when_manually_terminated = settings.when_manually_terminated;
+                return Ok(vibration_settings);
             } else {
                 return Err(IQOSError::ConfigurationError("Failed to parse vibration settings".to_string()));
             }

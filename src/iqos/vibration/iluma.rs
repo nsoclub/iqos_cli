@@ -21,11 +21,19 @@ pub const WHEN_CHARGING_START_OFF_SIGNALS: [&[u8]; 7] = [
     &[0x00, 0xC9, 0x07, 0x04, 0x04, 0x00, 0x00, 0x00, 0x08],
     &[0x00, 0xC9, 0x07, 0x04, 0x05, 0x00, 0x00, 0x00, 0x1E],
 ];
+
+const WHEN_CHARGE_START_ON_SIGNAL: [u8; 19] = [0x00, 0x08, 0x8B, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x56];
+const WHEN_CHARGE_START_OFF_SIGNAL: [u8; 19] = [0x00, 0x08, 0x8B, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xEE];
+
+#[derive(Debug, Clone, Copy)]
 pub struct IlumaVibration {
     pub when_charging_start: bool,
 }
 
 impl IlumaVibration {
+    pub fn new(when_charging_start: bool) -> Self {
+        Self { when_charging_start }
+    }
     pub fn when_charge_start(&self) -> bool {
         self.when_charging_start
     }
@@ -38,7 +46,6 @@ impl IlumaVibrationBehavior for VibrationSettings {
 
         let when_charge_start = self.iluma_and_higher.as_ref().unwrap().when_charge_start();
         
-        // 充電開始時の設定を追加
         if when_charge_start {
             ret.extend(
                 WHEN_CHARGING_START_ON_SIGNALS
@@ -156,4 +163,25 @@ impl IlumaVibrationBehavior for VibrationSettings {
             when_manually_terminated,
         })
     }
+
+    fn from_bytes_with_charge_start(bytes: &[u8]) -> Result<IlumaVibration> {
+        if bytes.len() < 19 {
+            return Err(IQOSError::ConfigurationError("Data too short for vibration settings".to_string()));
+        }
+
+        if bytes == &WHEN_CHARGE_START_ON_SIGNAL {
+            return Ok(IlumaVibration {
+                when_charging_start: true,
+            });
+        } else if bytes == &WHEN_CHARGE_START_OFF_SIGNAL {
+            return Ok(IlumaVibration {
+                when_charging_start: false,
+            });
+        }
+
+        Ok(IlumaVibration {
+            when_charging_start: bytes[8] == 0x01,
+        })
+
+   }
 } 

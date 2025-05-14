@@ -233,7 +233,10 @@ impl IQOSConsole {
                 } else if args_cloned.len() == 1 {
                     if let Some(iluma) = iqos.as_iluma() {
                         match iluma.load_iluma_vibration_settings().await {
-                            Ok(settings) => println!("{}", settings),
+                            Ok(settings) => {
+                                println!("is iluma : {:?}", settings);
+                                println!("{}", settings);
+                            },
                             Err(e) => println!("エラー: {}", e),
                         }
                     } else {
