@@ -37,3 +37,8 @@ pub trait IqosIluma: Send + Sync {
     
     async fn update_flexpuff(&self, enable: bool) -> Result<()>;
 }
+
+pub trait IqosIlumaI {
+    async fn update_flexbattery(&self) -> Result<()>;
+    async fn load_flexbattery(&self) -> Result<()>;
+}
