@@ -26,23 +26,24 @@ impl VibrationBehavior for VibrationSettings {
         let mut ret = vec![];
         let mut reg = 0u16;
 
-        if self.when_heating_start {
+        // Use the getter methods to handle Option fields properly
+        if self.when_heating_start() {
             reg |= WHEN_HEATING_START_SIGNAL;
         }
-        if self.when_starting_to_use {
+        if self.when_starting_to_use() {
             reg |= WHEN_STARTING_TO_USE_SIGNAL;
         }
-        if self.when_puff_end {
+        if self.when_puff_end() {
             reg |= WHEN_PUFF_END_SIGNAL;
         }
-        if self.when_manually_terminated {
+        if self.when_manually_terminated() {
             reg |= WHEN_MANUALLY_TERMINATED_SIGNAL;
         }
 
-        let all_other_settings_off = !self.when_heating_start && 
-                                           !self.when_starting_to_use && 
-                                           !self.when_puff_end && 
-                                           !self.when_manually_terminated;
+        let all_other_settings_off = !self.when_heating_start() && 
+                                      !self.when_starting_to_use() && 
+                                      !self.when_puff_end() && 
+                                      !self.when_manually_terminated();
 
         if all_other_settings_off {
             let mut signal = vec![0x00, 0xC9, 0x44, 0x23, 0x10, 0x00];
@@ -63,25 +64,25 @@ impl VibrationBehavior for VibrationSettings {
     }
 
     fn from_args(args: &[&str]) -> Result<VibrationSettings> {
-        let mut when_heating_start = false;
-        let mut when_starting_to_use = false;
-        let mut when_puff_end = false;
-        let mut when_manually_terminated = false;
+        let mut when_heating_start = None;
+        let mut when_starting_to_use = None;
+        let mut when_puff_end = None;
+        let mut when_manually_terminated = None;
         
         let mut i = 0;
         while i < args.len() - 1 {
             match args[i] {
                 "heating" => {
-                    when_heating_start = args[i+1] == "on";
+                    when_heating_start = Some(args[i+1] == "on");
                 },
                 "starting" => {
-                    when_starting_to_use = args[i+1] == "on";
+                    when_starting_to_use = Some(args[i+1] == "on");
                 },
                 "terminated" => {
-                    when_manually_terminated = args[i+1] == "on";
+                    when_manually_terminated = Some(args[i+1] == "on");
                 },
                 "puffend" => {
-                    when_puff_end = args[i+1] == "on";
+                    when_puff_end = Some(args[i+1] == "on");
                 },
                 _ => {}
             }
@@ -119,10 +120,10 @@ impl VibrationBehavior for VibrationSettings {
         
         Ok(Self {
             iluma_and_higher: None,
-            when_heating_start,
-            when_starting_to_use,
-            when_puff_end,
-            when_manually_terminated,
+            when_heating_start: Some(when_heating_start),
+            when_starting_to_use: Some(when_starting_to_use),
+            when_puff_end: Some(when_puff_end),
+            when_manually_terminated: Some(when_manually_terminated),
         })
     }
 }

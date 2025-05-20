@@ -3,9 +3,10 @@ use super::variant::{VibrationBehavior, IlumaVibrationBehavior};
 use super::settings::{VibrationSettings, WHEN_HEATING_START_SIGNAL, WHEN_STARTING_TO_USE_SIGNAL, WHEN_PUFF_END_SIGNAL, WHEN_MANUALLY_TERMINATED_SIGNAL};
 
 pub const WHEN_CHARGING_START_ON_SIGNALS: [&[u8]; 7] = [
-    &[0x01, 0xC9, 0x4F, 0x04, 0x72, 0x04, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    &[0x01, 0xC9, 0x4F, 0x04, 0x5B, 0x04, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
     &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06],
     &[0x01, 0xC9, 0x4F, 0x04, 0x72, 0x05, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    // &[0x01, 0xC9, 0x4F, 0x04, 0x72, 0x05, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
     &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x72],
     &[0x00, 0xC9, 0x47, 0x04, 0x00, 0xFF, 0xFF, 0x00, 0xDA],
     &[0x00, 0xC9, 0x07, 0x04, 0x04, 0x00, 0x00, 0x00, 0x08],
@@ -15,7 +16,8 @@ pub const WHEN_CHARGING_START_ON_SIGNALS: [&[u8]; 7] = [
 pub const WHEN_CHARGING_START_OFF_SIGNALS: [&[u8]; 7] = [
     &[0x01, 0xC9, 0x4F, 0x04, 0x64, 0x04, 0x00, 0xFF, 0xFF, 0xFF, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
     &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c],
-    &[0x01, 0xC9, 0x4F, 0x04, 0x4d, 0x05, 0x00, 0xFF, 0xFF, 0xFF, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    &[0x01, 0xC9, 0x4F, 0x04, 0x4D, 0x05, 0x00, 0xFF, 0xFF, 0xFF, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    // &[0x01, 0xC9, 0x4F, 0x04, 0x4d, 0x05, 0x00, 0xFF, 0xFF, 0xFF, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
     &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78],
     &[0x00, 0xC9, 0x47, 0x04, 0x00, 0xFF, 0xFF, 0x00, 0xDA],
     &[0x00, 0xC9, 0x07, 0x04, 0x04, 0x00, 0x00, 0x00, 0x08],
@@ -25,7 +27,7 @@ pub const WHEN_CHARGING_START_OFF_SIGNALS: [&[u8]; 7] = [
 const WHEN_CHARGE_START_ON_SIGNAL: [u8; 19] = [0x00, 0x08, 0x8B, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x56];
 const WHEN_CHARGE_START_OFF_SIGNAL: [u8; 19] = [0x00, 0x08, 0x8B, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xEE];
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct IlumaVibration {
     pub when_charging_start: bool,
 }
@@ -44,39 +46,25 @@ impl IlumaVibrationBehavior for VibrationSettings {
         let mut ret = vec![];
         let mut reg = 0u16;
 
-        let when_charge_start = self.iluma_and_higher.as_ref().unwrap().when_charge_start();
+        let when_charge_start = self.iluma_and_higher.as_ref().map_or(false, |iluma| iluma.when_charge_start());
         
-        if when_charge_start {
-            ret.extend(
-                WHEN_CHARGING_START_ON_SIGNALS
-                    .iter()
-                    .map(|&signal| signal.to_vec())
-            );
-        } else {
-            ret.extend(
-                WHEN_CHARGING_START_OFF_SIGNALS
-                    .iter()
-                    .map(|&signal| signal.to_vec())
-            );
-        }
-        
-        if self.when_heating_start {
+        if self.when_heating_start() {
             reg |= WHEN_HEATING_START_SIGNAL;
         }
-        if self.when_starting_to_use {
+        if self.when_starting_to_use() {
             reg |= WHEN_STARTING_TO_USE_SIGNAL;
         }
-        if self.when_puff_end {
+        if self.when_puff_end() {
             reg |= WHEN_PUFF_END_SIGNAL;
         }
-        if self.when_manually_terminated {
+        if self.when_manually_terminated() {
             reg |= WHEN_MANUALLY_TERMINATED_SIGNAL;
         }
 
-        let all_other_settings_off = !self.when_heating_start && 
-                                           !self.when_starting_to_use && 
-                                           !self.when_puff_end && 
-                                           !self.when_manually_terminated;
+        let all_other_settings_off = !self.when_heating_start() && 
+                                      !self.when_starting_to_use() && 
+                                      !self.when_puff_end() && 
+                                      !self.when_manually_terminated();
 
         if all_other_settings_off && !when_charge_start {
             let mut signal = vec![0x00, 0xC9, 0x44, 0x23, 0x10, 0x00];
@@ -93,41 +81,59 @@ impl IlumaVibrationBehavior for VibrationSettings {
         signal.push(self.checksum(&reg));
 
         ret.push(signal);
+        
+        if when_charge_start {
+            ret.extend(
+                WHEN_CHARGING_START_ON_SIGNALS
+                    .iter()
+                    .map(|&signal| signal.to_vec())
+            );
+        } else {
+            ret.extend(
+                WHEN_CHARGING_START_OFF_SIGNALS
+                    .iter()
+                    .map(|&signal| signal.to_vec())
+            );
+        }
+        
+        println!("  Signal: {:?}", ret);
         ret
     }
 
     fn from_args_with_charge_start(args: &[&str]) -> Result<VibrationSettings> {
-        let mut when_charging_start = false;
-        let mut when_heating_start = false;
-        let mut when_starting_to_use = false;
-        let mut when_puff_end = false;
-        let mut when_manually_terminated = false;
+        let mut when_charging_start = None;
+        let mut when_heating_start = None;
+        let mut when_starting_to_use = None;
+        let mut when_puff_end = None;
+        let mut when_manually_terminated = None;
         
         let mut i = 0;
         while i < args.len() - 1 {
             match args[i] {
                 "charge" => {
-                    when_charging_start = args[i+1] == "on";
+                    when_charging_start = Some(args[i+1] == "on");
                 },
                 "heating" => {
-                    when_heating_start = args[i+1] == "on";
+                    when_heating_start = Some(args[i+1] == "on");
                 },
                 "starting" => {
-                    when_starting_to_use = args[i+1] == "on";
+                    when_starting_to_use = Some(args[i+1] == "on");
                 },
                 "terminated" => {
-                    when_manually_terminated = args[i+1] == "on";
+                    when_manually_terminated = Some(args[i+1] == "on");
                 },
                 "puffend" => {
-                    when_puff_end = args[i+1] == "on";
+                    when_puff_end = Some(args[i+1] == "on");
                 },
                 _ => {}
             }
             i += 2;
         }
         
-        Ok(Self {
-            iluma_and_higher: Some(IlumaVibration { when_charging_start }),
+        let iluma_and_higher = when_charging_start.map(|value| IlumaVibration { when_charging_start: value });
+        
+        Ok(VibrationSettings {
+            iluma_and_higher,
             when_heating_start,
             when_starting_to_use,
             when_puff_end,
@@ -144,9 +150,6 @@ impl IlumaVibrationBehavior for VibrationSettings {
             return Err(IQOSError::ConfigurationError("Invalid header for vibration settings".to_string()));
         }
 
-        // Parse vibration settings from bytes 8 and 9
-        // Byte 8 (index 7) contains "heat" (bit 0) and "use" (bit 4) settings
-        // Byte 9 (index 8) contains "end" (bit 0) and "terminated" (bit 4) settings
         let heat_use_byte = bytes[6];
         let end_terminated_byte = bytes[7];
         
@@ -157,10 +160,10 @@ impl IlumaVibrationBehavior for VibrationSettings {
         
         Ok(Self {
             iluma_and_higher: None,
-            when_heating_start,
-            when_starting_to_use,
-            when_puff_end,
-            when_manually_terminated,
+            when_heating_start: Some(when_heating_start),
+            when_starting_to_use: Some(when_starting_to_use),
+            when_puff_end: Some(when_puff_end),
+            when_manually_terminated: Some(when_manually_terminated),
         })
     }
 
@@ -182,6 +185,9 @@ impl IlumaVibrationBehavior for VibrationSettings {
         Ok(IlumaVibration {
             when_charging_start: bytes[8] == 0x01,
         })
+    }
 
-   }
-} 
+    fn iluma_vibration(&self) -> IlumaVibration {
+        self.iluma_and_higher.unwrap().clone()
+    }
+}

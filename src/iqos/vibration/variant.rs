@@ -20,4 +20,6 @@ pub trait IlumaVibrationBehavior: VibrationBehavior {
     fn from_bytes_with_charge_start(bytes: &[u8]) -> Result<iluma::IlumaVibration>;
 
     fn build(&self) -> Vec<Vec<u8>>;
+
+    fn iluma_vibration(&self) -> iluma::IlumaVibration;
 }

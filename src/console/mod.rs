@@ -223,7 +223,7 @@ impl IQOSConsole {
                     
                     if let Some(iluma) = iqos.as_iluma() {
                         let settings = VibrationSettings::from_args_with_charge_start(param_args)?;
-                        iluma.update_vibration_settings(settings).await?;
+                        iluma.update_iluma_vibration_settings(settings).await?;
                         println!("バイブレーション設定を更新しました");
                     } else {
                         let settings = VibrationSettings::from_args(param_args)?;

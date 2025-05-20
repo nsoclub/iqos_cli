@@ -92,24 +92,35 @@ impl IqosIluma for IqosBle {
         }
     }
 
-    async fn update_iluma_vibration_settings(&self, settings: VibrationSettings) -> Result<()> {
+    async fn update_iluma_vibration_settings(&self, updates: VibrationSettings) -> Result<()> {
         if !self.is_iluma() {
             return Err(IQOSError::IncompatibleModelError);
         }
 
-        if let Some(iluma) = settings.as_iluma() {
-            let signals = iluma.build();
-            for (i, signal) in signals.iter().enumerate() {
-                let hex_string = signal.iter()
-                    .map(|byte| format!("{:02X}", byte))
-                    .collect::<Vec<String>>()
-                    .join(" ");
-                println!("  Signal {}: {}", i, hex_string);
-            }
-            
-            for signal in signals {
-                self.send_command(signal).await?;
-            }
+        let current_settings = self.load_iluma_vibration_settings().await?;
+        
+        println!("Current settings: {}", current_settings);
+        let mut new_settings = VibrationSettings::new(
+            updates.when_heating_start.unwrap_or(current_settings.when_heating_start()),
+            updates.when_starting_to_use.unwrap_or(current_settings.when_starting_to_use()),
+            updates.when_puff_end.unwrap_or(current_settings.when_puff_end()),
+            updates.when_manually_terminated.unwrap_or(current_settings.when_manually_terminated()),
+        );
+        
+        new_settings.iluma_and_higher = Some(updates.iluma_and_higher.unwrap_or(current_settings.iluma_vibration()));
+        
+        // Generate and send only the necessary signals
+        let signals = IlumaVibrationBehavior::build(&new_settings);
+        for (i, signal) in signals.iter().enumerate() {
+            let hex_string = signal.iter()
+                .map(|byte| format!("{:02X}", byte))
+                .collect::<Vec<String>>()
+                .join(" ");
+            println!("  Signal {}: {}", i, hex_string);
+        }
+        
+        for signal in signals {
+            self.send_command(signal).await?;
         }
 
         Ok(())

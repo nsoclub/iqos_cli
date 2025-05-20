@@ -1,8 +1,7 @@
 use super::error::Result;
 use super::brightness::BrightnessLevel;
-use super::vibration::VibrationSettings;
+use super::vibration::{IlumaVibrationBehavior, VibrationSettings};
 
-/// すべてのIQOSデバイスに共通する基本機能
 pub trait Iqos {
     async fn disconnect(&mut self) -> Result<()>;
     
