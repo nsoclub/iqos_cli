@@ -7,9 +7,9 @@ use futures::stream::StreamExt;
 use std::error::Error;
 
 mod iqos;
-mod console;
+mod loader;
 
-use console::run_console;
+use loader::run_console;
 use iqos::{Iqos, IqosIluma, IqosBle};
 
 async fn get_central(manager: &Manager) -> Adapter {

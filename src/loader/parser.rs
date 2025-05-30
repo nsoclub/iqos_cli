@@ -8,14 +8,13 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::future::Future;
 
-mod iqoshelper;
-use iqoshelper::IqosHelper;
+use crate::loader::iqoshelper::IqosHelper;
 
 use crate::iqos::vibration::IlumaVibrationBehavior;
 use crate::iqos::{IqosBle, BrightnessLevel, IqosIluma, IqosIlumaI, Iqos, VibrationSettings, vibration::VibrationBehavior};
 use crate::iqos::flexbattery::{FlexBattery, FlexbatteryMode};
 
-// クロージャーの型定義を修正
+// Command function type definition
 type CommandFn = Box<dyn Fn(&IQOSConsole, Vec<String>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
 
 #[derive(Clone)]
@@ -63,16 +62,16 @@ impl IQOSConsole {
                     Some(Ok(level)) => {
                         if iqos.is_iluma() {
                             iqos.update_brightness(level).await?;
-                            println!("明るさを{}に設定しました", level);
+                            println!("Set brightness to {}", level);
                         } else {
-                            println!("このデバイスはILUMAモデルではありません");
+                            println!("This device is not an ILUMA model");
                         }
                     },
                     Some(Err(e)) => println!("{}", e),
                     None => iqos.load_brightness().await.map(|level| {
                         println!("{}", level);
                     }).unwrap_or_else(|_| {
-                        println!("このデバイスはILUMAモデルではありません");
+                        println!("This device is not an ILUMA model");
                     }),
                 }
                 Ok(())
@@ -134,10 +133,10 @@ impl IQOSConsole {
                     if let Some(iluma_i) = iqos.as_iluma_i() {
                         match iluma_i.load_flexbattery().await {
                             Ok(flexbattery) => println!("\n{}\n", flexbattery),
-                            Err(e) => println!("エラー: {}", e),
+                            Err(e) => println!("Error: {}", e),
                         }
                     } else {
-                        println!("このデバイスはILUMAモデルではありません");
+                        println!("This device is not an ILUMA model");
                     }
                 } else if args_cloned.len() >= 2 {
                     if let Some(iluma_i) = iqos.as_iluma_i() {
@@ -145,10 +144,10 @@ impl IQOSConsole {
                         iluma_i.update_flexbattery(fb).await?;
                         println!("Flexbattery mode updated.");
                     } else {
-                        println!("このデバイスはILUMAモデルではありません");
+                        println!("This device is not an ILUMA model");
                     }
                 } else {
-                    println!("使い方: flexbattery [performance|eco] | pause [on|off]");
+                    println!("Usage: flexbattery [performance|eco] | pause [on|off]");
                 }
                 Ok(())
             })
@@ -164,18 +163,18 @@ impl IQOSConsole {
                         let result = iqos.update_flexpuff(true).await;
                         match result {
                             Ok(_) => println!("Flexpuff enabled"),
-                            Err(e) => println!("エラー: {}", e),
+                            Err(e) => println!("Error: {}", e),
                         }
                     },
                     Some("disable") => {
                         let result = iqos.update_flexpuff(false).await;
                         match result {
                             Ok(_) => println!("Flexpuff disabled"),
-                            Err(e) => println!("エラー: {}", e),
+                            Err(e) => println!("Error: {}", e),
                         }
                     },
-                    Some(opt) => println!("無効なオプション: {}。'enable'または'disable'を指定してください", opt),
-                    None => println!("使い方: flexpuff [enable|disable]"),
+                    Some(opt) => println!("Invalid option: {}. Please specify 'enable' or 'disable'", opt),
+                    None => println!("Usage: flexpuff [enable|disable]"),
                 }
                 Ok(())
             })
@@ -189,26 +188,24 @@ impl IQOSConsole {
                 if let Some(iluma) = iqos.as_iluma() {
                     match args_cloned.get(1).map(|s| s.as_str()) {
                         Some("enable") => {
-                            // Turn the future into a proper Send future
                             let result = iluma.update_smartgesture(true).await;
                             match result {
-                                Ok(_) => println!("スマートジェスチャーを有効にしました"),
-                                Err(e) => println!("エラー: {}", e),
+                                Ok(_) => println!("Smart Gesture enabled"),
+                                Err(e) => println!("Error: {}", e),
                             }
                         },
                         Some("disable") => {
-                            // Turn the future into a proper Send future
                             let result = iluma.update_smartgesture(false).await;
                             match result {
-                                Ok(_) => println!("スマートジェスチャーを無効にしました"),
-                                Err(e) => println!("エラー: {}", e),
+                                Ok(_) => println!("Smart Gesture disabled"),
+                                Err(e) => println!("Error: {}", e),
                             }
                         },
-                        Some(opt) => println!("無効なオプション: {}。'enable'または'disable'を指定してください", opt),
-                        None => println!("使い方: smartgesture [enable|disable]"),
+                        Some(opt) => println!("Invalid option: {}. Please specify 'enable' or 'disable'", opt),
+                        None => println!("Usage: smartgesture [enable|disable]"),
                     }
                 } else {
-                    println!("このデバイスはILUMAモデルではありません");
+                    println!("This device is not an ILUMA model");
                 }
                 Ok(())
             })
@@ -225,20 +222,20 @@ impl IQOSConsole {
                             let result = iqos.update_autostart(true).await;
                             match result {
                                 Ok(_) => println!("Autostart enabled"),
-                                Err(e) => println!("エラー: {}", e),
+                                Err(e) => println!("Error: {}", e),
                             }
                         },
                         s if s == "off" || s == "disable" => {
                             let result = iqos.update_autostart(false).await;
                             match result {
                                 Ok(_) => println!("Autostart disabled"),
-                                Err(e) => println!("エラー: {}", e),
+                                Err(e) => println!("Error: {}", e),
                             }
                         },
-                        _ => println!("使い方: autostart [on|off]"),
+                        _ => println!("Usage: autostart [on|off]"),
                     }
                 } else {
-                    println!("使い方: autostart [on|off]");
+                    println!("Usage: autostart [on|off]");
                 }
                 Ok(())
             })
@@ -257,11 +254,11 @@ impl IQOSConsole {
                     if let Some(iluma) = iqos.as_iluma() {
                         let settings = VibrationSettings::from_args_with_charge_start(param_args)?;
                         iluma.update_iluma_vibration_settings(settings).await?;
-                        println!("バイブレーション設定を更新しました");
+                        println!("Vibration settings updated");
                     } else {
                         let settings = VibrationSettings::from_args(param_args)?;
                         iqos.update_vibration_settings(settings).await?;
-                        println!("バイブレーション設定を更新しました");
+                        println!("Vibration settings updated");
                     }
                 } else if args_cloned.len() == 1 {
                     if let Some(iluma) = iqos.as_iluma() {
@@ -270,18 +267,18 @@ impl IQOSConsole {
                                 println!("is iluma : {:?}", settings);
                                 println!("{}", settings);
                             },
-                            Err(e) => println!("エラー: {}", e),
+                            Err(e) => println!("Error: {}", e),
                         }
                     } else {
                         match iqos.load_vibration_settings().await {
                             Ok(settings) => println!("{}", settings),
-                            Err(e) => println!("エラー: {}", e),
+                            Err(e) => println!("Error: {}", e),
                         }
                     }
                 } else {
-                    println!("使い方: vibration [charge|heating|starting|terminated|puffend] [on|off] ...");
-                    println!("例: vibration charge on heating on puffend on");
-                    println!("注: chargeオプションはILUMAモデルのみ対応");
+                    println!("Usage: vibration [charge|heating|starting|terminated|puffend] [on|off] ...");
+                    println!("Example: vibration charge on heating on puffend on");
+                    println!("Note: charge option is only available for ILUMA models");
                 }
                 Ok(())
             })
@@ -293,29 +290,29 @@ impl IQOSConsole {
                 let iqos = iqos.lock().await;
                 let is_iluma = iqos.is_iluma();
                 
-                println!("利用可能なコマンド:");
+                println!("Available commands:");
                 
-                // 共通コマンド
-                println!("  battery - バッテリーの状態を表示します");
-                println!("  lock | unlock - デバイスをロックまたはアンロックします");
-                println!("  findmyiqos - デバイスを探す機能を起動します");
-                println!("  autostart [on|off] - オートスタート機能を設定します");
+                // Common commands
+                println!("  battery - Display battery status");
+                println!("  lock | unlock - Lock or unlock the device");
+                println!("  findmyiqos - Activate find my device feature");
+                println!("  autostart [on|off] - Configure auto-start feature");
                 
-                // ILUMAモデル固有のコマンド
+                // ILUMA model specific commands
                 if is_iluma {
-                    println!("\nILUMAモデル固有のコマンド:");
-                    println!("  brightness [high|low] - 明るさを設定します");
-                    println!("  smartgesture [enable|disable] - スマートジェスチャー機能を設定します");
-                    println!("  flexpuff [enable|disable] - フレックスパフ機能を設定します");
-                    println!("  vibration [option on|off]... - バイブレーション設定を構成します");
-                    println!("    例: vibration charge on heating on puffend on");
-                    println!("    オプション: charge, heating, starting, terminated, puffend");
+                    println!("\nILUMA model specific commands:");
+                    println!("  brightness [high|low] - Set brightness");
+                    println!("  smartgesture [enable|disable] - Configure Smart Gesture feature");
+                    println!("  flexpuff [enable|disable] - Configure FlexPuff feature");
+                    println!("  vibration [option on|off]... - Configure vibration settings");
+                    println!("    Example: vibration charge on heating on puffend on");
+                    println!("    Options: charge, heating, starting, terminated, puffend");
                 }
                 
-                println!("\nその他のコマンド:");
-                println!("  info - デバイスのステータスを表示します");
-                println!("  help - このヘルプメッセージを表示します");
-                println!("  quit | exit - プログラムを終了します");
+                println!("\nOther commands:");
+                println!("  info - Display device status");
+                println!("  help - Display this help message");
+                println!("  quit | exit - Exit the program");
                 
                 Ok(())
             })
@@ -352,15 +349,15 @@ impl IQOSConsole {
         if let Some(handler) = self.commands.lock().await.get(&cmd) {
             handler(self, args).await?;
         } else {
-            println!("不明なコマンド: {}。'help'で利用可能なコマンドを表示します。", cmd);
+            println!("Unknown command: {}. Use 'help' to display available commands.", cmd);
         }
         
         Ok(true)
     }
     
     pub async fn run(&mut self) -> Result<()> {
-        println!("IQOS コマンドコンソール v0.1.0");
-        println!("'help'で利用可能なコマンドを表示、'exit'で終了します");
+        println!("IQOS Command Console v0.1.0");
+        println!("Type 'help' to display available commands, 'exit' to quit");
         
         let config = Config::builder().build();
         let mut rl = Editor::<IqosHelper, rustyline::history::DefaultHistory>::with_config(config)?;
@@ -368,7 +365,7 @@ impl IQOSConsole {
         rl.set_helper(Some(helper));
         
         if rl.load_history("history.txt").is_err() {
-            println!("履歴ファイルが見つかりません");
+            println!("No history file found");
         }
         
         self.running = true;
@@ -385,7 +382,7 @@ impl IQOSConsole {
                             }
                         },
                         Err(e) => {
-                            println!("コマンド実行エラー: {}", e);
+                            println!("Command execution error: {}", e);
                         }
                     }
                 },
@@ -398,7 +395,7 @@ impl IQOSConsole {
                     break;
                 },
                 Err(err) => {
-                    println!("エラー: {:?}", err);
+                    println!("Error: {:?}", err);
                     break;
                 }
             }
@@ -410,10 +407,10 @@ impl IQOSConsole {
     }
 }
 
-// 互換性のために古い型名を提供
+// For backward compatibility
 pub type CommandSystem = IQOSConsole;
 
-// 互換性のための関数
+// Function for backward compatibility
 pub async fn run_console(iqos: IqosBle) -> Result<()> {
     let mut console = IQOSConsole::new(iqos);
     console.run().await
