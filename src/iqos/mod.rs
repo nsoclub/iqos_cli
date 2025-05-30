@@ -1,8 +1,10 @@
 mod builder;
 mod iqos;
 pub mod iluma;
+pub mod iluma_i;
 mod error;
 mod device;
+pub mod flexbattery;
 pub mod brightness;
 pub mod vibration;
 
@@ -13,7 +15,7 @@ mod tests;
 
 pub use builder::IQOSBuilder;
 pub use iqos::IqosBle;
-pub use device::{Iqos, IqosIluma};
+pub use device::{Iqos, IqosIluma, IqosIlumaI};
 pub use brightness::BrightnessLevel;
 pub use vibration::VibrationSettings;
 

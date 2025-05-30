@@ -12,7 +12,8 @@ mod iqoshelper;
 use iqoshelper::IqosHelper;
 
 use crate::iqos::vibration::IlumaVibrationBehavior;
-use crate::iqos::{IqosBle, BrightnessLevel, IqosIluma, Iqos, VibrationSettings, vibration::VibrationBehavior};
+use crate::iqos::{IqosBle, BrightnessLevel, IqosIluma, IqosIlumaI, Iqos, VibrationSettings, vibration::VibrationBehavior};
+use crate::iqos::flexbattery::{FlexBattery, FlexbatteryMode};
 
 // クロージャーの型定義を修正
 type CommandFn = Box<dyn Fn(&IQOSConsole, Vec<String>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
@@ -117,6 +118,38 @@ impl IQOSConsole {
                     }
                 }
 
+                Ok(())
+            })
+        }));
+
+        commands.insert("flexbattery".to_string(), Box::new(|console: &IQOSConsole, args | {
+            let iqos = console.iqos.clone();
+            let args_cloned = args.clone();
+            Box::pin(async move {
+                let iqos = iqos.lock().await;
+                let str_args: Vec<&str> = args_cloned.iter().map(|s| s.as_str()).collect();
+
+                if args_cloned.len() == 1 {
+                    // No arguments provided, show current flexbattery mode
+                    if let Some(iluma_i) = iqos.as_iluma_i() {
+                        match iluma_i.load_flexbattery().await {
+                            Ok(flexbattery) => println!("\n{}\n", flexbattery),
+                            Err(e) => println!("エラー: {}", e),
+                        }
+                    } else {
+                        println!("このデバイスはILUMAモデルではありません");
+                    }
+                } else if args_cloned.len() >= 2 {
+                    if let Some(iluma_i) = iqos.as_iluma_i() {
+                        let fb = FlexBattery::from_args(&str_args[1..])?;
+                        iluma_i.update_flexbattery(fb).await?;
+                        println!("Flexbattery mode updated.");
+                    } else {
+                        println!("このデバイスはILUMAモデルではありません");
+                    }
+                } else {
+                    println!("使い方: flexbattery [performance|eco] | pause [on|off]");
+                }
                 Ok(())
             })
         }));

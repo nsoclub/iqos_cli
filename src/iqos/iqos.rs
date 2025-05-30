@@ -37,7 +37,7 @@ impl std::fmt::Display for IQOSModel {
         match self {
             IQOSModel::One => write!(f, "ONE"),
             IQOSModel::Iluma => write!(f, "ILUMA"),
-            IQOSModel::IlumaI => write!(f, "ILUMA I"),
+            IQOSModel::IlumaI => write!(f, "ILUMA i"),
         }
     }
 }
@@ -50,7 +50,7 @@ impl IQOSModel {
                     if name.contains("ONE") {
                         return IQOSModel::One;
                     }
-                    else if name.contains("ILUMA I") {
+                    else if name.contains("ILUMA i") {
                         return IQOSModel::IlumaI;
                     }
                     else if name.contains("ILUMA") {
@@ -287,7 +287,7 @@ impl Iqos for IqosBle {
 
 impl std::fmt::Display for IqosBle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.is_iluma() {
+        if self.is_iluma_or_higher() {
             return write!(
                 f,
                 "Model: {}\nModel Number: {}\nSerial Number: {}\nManufacturer Name: {}\n\nStick:\n\tProduct Number: {}\n\tSoftware Revision: {}\nHolder:\n\tHolder Product Number: {}",

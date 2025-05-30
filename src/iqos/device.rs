@@ -1,6 +1,7 @@
 use super::error::Result;
 use super::brightness::BrightnessLevel;
 use super::vibration::{IlumaVibrationBehavior, VibrationSettings};
+use super::flexbattery::FlexBattery;
 
 pub trait Iqos {
     async fn disconnect(&mut self) -> Result<()>;
@@ -39,6 +40,6 @@ pub trait IqosIluma: Send + Sync {
 }
 
 pub trait IqosIlumaI {
-    async fn update_flexbattery(&self) -> Result<()>;
-    async fn load_flexbattery(&self) -> Result<()>;
+    async fn update_flexbattery(&self, new: FlexBattery) -> Result<()>;
+    async fn load_flexbattery(&self) -> Result<FlexBattery>;
 }
