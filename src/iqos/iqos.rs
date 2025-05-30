@@ -25,7 +25,6 @@ pub const UNLOCK_SIGNALS: [&[u8]; 2] = [
 ];
 // pub const UNLOCK_SIGNAL_SECOND: [u8; 5] = [0x00, 0xc9, 0x00, 0x04, 0xC0];
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum IQOSModel {
     One,
@@ -51,13 +50,18 @@ impl IQOSModel {
                     if name.contains("ONE") {
                         return IQOSModel::One;
                     }
+                    else if name.contains("ILUMA I") {
+                        return IQOSModel::IlumaI;
+                    }
+                    else if name.contains("ILUMA") {
+                        return IQOSModel::Iluma;
+                    }
                 }
             }
         }
         IQOSModel::Iluma
     }
 }
-
 
 pub struct IqosBle {
     modelnumber: String,
@@ -109,17 +113,6 @@ impl IqosBle {
         Ok(Box::pin(self.peripheral.notifications().await?))
     }
     
-    pub async fn print_notifications(&self) -> Result<()> {
-        let mut notifications = self.notifications().await.map_err(IQOSError::BleError)?;
-        // tokio::pin!(notifications);
-        
-        while let Some(data) = notifications.next().await {
-            println!("Notification: {:?}", data);
-        }
-        
-        Ok(())
-    }
-
     pub async fn send_command(&self, command: Vec<u8>) -> Result<()> {
         let peripheral = &self.peripheral;
         
@@ -156,8 +149,19 @@ impl IqosBle {
         matches!(self.model, IQOSModel::Iluma)
     }
 
+    pub fn is_iluma_or_higher(&self) -> bool {
+        matches!(self.model, IQOSModel::Iluma | IQOSModel::IlumaI)
+    }
+
     pub fn is_iluma_i(&self) -> bool {
         matches!(self.model, IQOSModel::IlumaI)
+    }
+    
+    pub fn as_iluma_i(&self) -> Option<&IqosBle> {
+        match self.model {
+            IQOSModel::IlumaI => Some(self),
+            _ => None,
+        }
     }
 
     pub fn model(&self) -> &IQOSModel {
@@ -171,28 +175,6 @@ impl IqosBle {
     pub(crate) fn scp_control_characteristic(&self) -> &Characteristic {
         &self.scp_control_characteristic
     }
-
-    pub(crate) fn battery_characteristic(&self) -> &Characteristic {
-        &self.battery_characteristic
-    }
-
-    // チェックサム計算と追加をpubに変更してテストから再利用可能に
-    pub fn calculate_checksum(&self, command: &Vec<u8>) -> u8 {
-        let sum: u8 = command.iter().fold(0u8, |acc, &x| acc.wrapping_add(x));
-        
-        println!("Checksum: {}", sum ^ COMMAND_CHECKSUM_XOR);
-        sum ^ COMMAND_CHECKSUM_XOR
-    }
-
-    pub fn with_checksum(&self, command: Vec<u8>) -> Vec<u8> {
-        let mut cmd = command;
-        let checksum = self.calculate_checksum(&cmd);
-        println!("orig: {:?}", [0x00, 0xc9, 0x44, 0x04, 0x02, 0xff, 0x00, 0x00, 0x5a]);
-        cmd.push(checksum);
-        println!("calc: {:?}", &cmd);
-        cmd
-    }
-
 }
 
 impl Iqos for IqosBle {

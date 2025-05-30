@@ -56,7 +56,7 @@ impl IqosIluma for IqosBle {
             false,
             false,
         );
-        if !self.is_iluma() {
+        if !self.is_iluma_or_higher() {
             return Err(IQOSError::IncompatibleModelError);
         }
         self.send_command(LOAD_VIBRATE_CHARGE_START_SIGNAL.to_vec()).await?;
@@ -93,7 +93,7 @@ impl IqosIluma for IqosBle {
     }
 
     async fn update_iluma_vibration_settings(&self, updates: VibrationSettings) -> Result<()> {
-        if !self.is_iluma() {
+        if !self.is_iluma_or_higher() {
             return Err(IQOSError::IncompatibleModelError);
         }
 
@@ -127,7 +127,7 @@ impl IqosIluma for IqosBle {
     }
 
     async fn update_smartgesture(&self, enable: bool) -> Result<()> {
-        if !self.is_iluma() {
+        if !self.is_iluma_or_higher() {
             return Err(IQOSError::IncompatibleModelError);
         }
 
@@ -150,7 +150,7 @@ impl IqosIluma for IqosBle {
     }
 
     async fn update_autostart(&self, enable: bool) -> Result<()> {
-        if !self.is_iluma() {
+        if !self.is_iluma_or_higher() {
             return Err(IQOSError::IncompatibleModelError);
         }
 
@@ -173,7 +173,7 @@ impl IqosIluma for IqosBle {
     }
 
     async fn update_flexpuff(&self, enable: bool) -> Result<()> {
-        if !self.is_iluma() {
+        if !self.is_iluma_or_higher() {
             return Err(IQOSError::IncompatibleModelError);
         }
 
