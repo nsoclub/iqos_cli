@@ -30,6 +30,7 @@ pub const UNLOCK_SIGNALS: [&[u8]; 2] = [
 pub enum IQOSModel {
     One,
     Iluma,
+    IlumaI
 }
 
 impl std::fmt::Display for IQOSModel {
@@ -37,6 +38,7 @@ impl std::fmt::Display for IQOSModel {
         match self {
             IQOSModel::One => write!(f, "ONE"),
             IQOSModel::Iluma => write!(f, "ILUMA"),
+            IQOSModel::IlumaI => write!(f, "ILUMA I"),
         }
     }
 }
@@ -154,11 +156,14 @@ impl IqosBle {
         matches!(self.model, IQOSModel::Iluma)
     }
 
+    pub fn is_iluma_i(&self) -> bool {
+        matches!(self.model, IQOSModel::IlumaI)
+    }
+
     pub fn model(&self) -> &IQOSModel {
         &self.model
     }
 
-    // フィールド名と同じ名前のgetterメソッド
     pub(crate) fn peripheral(&self) -> &Peripheral {
         &self.peripheral
     }
