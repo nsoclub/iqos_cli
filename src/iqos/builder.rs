@@ -107,17 +107,6 @@ impl IQOSBuilder {
             .map_err(IQOSError::BleError)
     }
 
-    pub async fn find_service_by_uuid(&self, uuid: Uuid) -> Result<Option<Service>> {
-        let peripheral = self.peripheral
-            .as_ref()
-            .ok_or(IQOSError::ConfigurationError("Peripheral is required".to_string()))?;
-        
-        // サービスのイテレータからUUIDが一致するものを検索
-        Ok(peripheral.services().iter()
-            .find(|s| s.uuid == uuid)
-            .cloned())
-    }
-
     async fn load_product_num(&mut self) -> Result<()> {
         let peripheral = self.peripheral
             .as_ref()
@@ -250,13 +239,6 @@ impl IQOSBuilder {
         ).await;
 
         Ok(iqos)
-    }
-
-    // 生のPeripheralを取得するメソッドを追加
-    pub fn peripheral(&self) -> Result<&Peripheral> {
-        self.peripheral
-            .as_ref()
-            .ok_or(IQOSError::ConfigurationError("Peripheral is required".to_string()))
     }
 }
 
