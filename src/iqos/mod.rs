@@ -7,6 +7,7 @@ mod device;
 pub mod flexbattery;
 pub mod brightness;
 pub mod vibration;
+pub mod flexpuff;
 
 use uuid::{uuid, Uuid};
 
@@ -18,6 +19,7 @@ pub use iqos::IqosBle;
 pub use device::{Iqos, IqosIluma, IqosIlumaI};
 pub use brightness::BrightnessLevel;
 pub use vibration::VibrationSettings;
+pub use flexpuff::Flexpuff;
 
 // Service UUIDs
 pub const DEVICE_INFO_SERVICE_UUID: Uuid = uuid!("0000180a-0000-1000-8000-00805f9b34fb");

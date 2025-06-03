@@ -6,6 +6,7 @@ use crate::iqos::vibration::{self, VibrationSettings, LOAD_VIBRATION_SETTINGS_SI
 use super::device::IqosIluma;
 use super::iqos::IqosBle;
 use super::vibration::{IlumaVibration, IlumaVibrationBehavior};
+use super::flexpuff::{Flexpuff, LOAD_FLEXPUFF_SIGNAL};
 use btleplug::api::{Peripheral as _, WriteType};
 
 pub struct IlumaSpecific {
@@ -137,14 +138,7 @@ impl IqosIluma for IqosBle {
             SMARTGESTURE_DISABLE_SIGNAL
         };
 
-        let peripheral = self.peripheral();
-        let characteristic = self.scp_control_characteristic();
-        
-        peripheral.write(
-            characteristic,
-            &signal,
-            WriteType::WithResponse,
-        ).await.map_err(IQOSError::BleError)?;
+        self.send_command(signal.to_vec()).await?;
 
         Ok(())
     }
@@ -160,37 +154,41 @@ impl IqosIluma for IqosBle {
             AUTOSTART_DISABLE_SIGNAL
         };
 
-        let peripheral = self.peripheral();
-        let characteristic = self.scp_control_characteristic();
-        
-        peripheral.write(
-            characteristic,
-            &signal,
-            WriteType::WithResponse,
-        ).await.map_err(IQOSError::BleError)?;
+        self.send_command(signal.to_vec()).await?;
 
         Ok(())
     }
 
-    async fn update_flexpuff(&self, enable: bool) -> Result<()> {
+    async fn load_flexpuff(&self) -> Result<Flexpuff> {
         if !self.is_iluma_or_higher() {
             return Err(IQOSError::IncompatibleModelError);
         }
 
-        let signal = if enable {
-            FLEXPUFF_ENABLE_SIGNAL
-        } else {
-            FLEXPUFF_DISABLE_SIGNAL
-        };
+        self.send_command(LOAD_FLEXPUFF_SIGNAL.to_vec()).await?;
+        let mut stream = self.notifications().await?;
 
-        let peripheral = self.peripheral();
-        let characteristic = self.scp_control_characteristic();
-        
-        peripheral.write(
-            characteristic,
-            &signal,
-            WriteType::WithResponse,
-        ).await.map_err(IQOSError::BleError)?;
+        if let Some(notification) = stream.next().await {
+            if let Ok(settings) = Flexpuff::from_bytes(&notification.value) {
+                let hex_string = notification.value.iter()
+                    .map(|byte| format!("{:02X}", byte))
+                    .collect::<Vec<String>>()
+                    .join(" ");
+                println!("  Signal: {}", hex_string);
+                return Ok(settings);
+            } else {
+                return Err(IQOSError::ConfigurationError("Failed to parse flexpuff settings".to_string()));
+            }
+        } else {
+            return Err(IQOSError::ConfigurationError("No notifications received".to_string()));
+        }
+    }
+
+    async fn update_flexpuff(&self, setting: Flexpuff) -> Result<()> {
+        if !self.is_iluma_or_higher() {
+            return Err(IQOSError::IncompatibleModelError);
+        }
+
+        self.send_command(setting.to_bytes()).await?;
 
         Ok(())
     }

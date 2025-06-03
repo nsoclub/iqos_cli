@@ -159,22 +159,28 @@ impl IQOSConsole {
             Box::pin(async move {
                 let iqos = iqos.lock().await;
                 match args_cloned.get(1).map(|s| s.as_str()) {
+                    Some("status") => {
+                        let status = iqos.load_flexpuff().await?;
+                        println!("\nFlexpuff status: {}\n", status);
+                    },
                     Some("enable") => {
-                        let result = iqos.update_flexpuff(true).await;
+                        let flexpuff = crate::iqos::flexpuff::Flexpuff::new(true);
+                        let result = iqos.update_flexpuff(flexpuff).await;
                         match result {
                             Ok(_) => println!("Flexpuff enabled"),
                             Err(e) => println!("Error: {}", e),
                         }
                     },
                     Some("disable") => {
-                        let result = iqos.update_flexpuff(false).await;
+                        let flexpuff = crate::iqos::flexpuff::Flexpuff::new(false);
+                        let result = iqos.update_flexpuff(flexpuff).await;
                         match result {
                             Ok(_) => println!("Flexpuff disabled"),
                             Err(e) => println!("Error: {}", e),
                         }
                     },
                     Some(opt) => println!("Invalid option: {}. Please specify 'enable' or 'disable'", opt),
-                    None => println!("Usage: flexpuff [enable|disable]"),
+                    None => println!("Usage: flexpuff [status|enable|disable]"),
                 }
                 Ok(())
             })
