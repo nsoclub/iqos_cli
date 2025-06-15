@@ -1,7 +1,6 @@
-use anyhow::Result;
-use crate::iqos::IqosBle;
+pub mod iqoshelper;
+pub mod parser;
+pub mod cmds;
 
-mod iqoshelper;
-mod parser;
-
-pub use parser::{IQOSConsole, CommandSystem, run_console};
+// Re-export essential components for ease of use
+pub use parser::{IQOSConsole, run_console};
